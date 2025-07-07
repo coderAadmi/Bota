@@ -7,6 +7,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
 
     <application
@@ -36,6 +37,12 @@
             android:name=".service.MonitorService"
             android:foregroundServiceType="dataSync"
             android:exported="false">
+        </service>
+
+        <service android:name=".network.NetworkService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" >
+
         </service>
 
     </application>

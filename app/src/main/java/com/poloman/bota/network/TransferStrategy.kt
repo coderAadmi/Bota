@@ -12,6 +12,8 @@ sealed class Result{
 
 interface SendStrategy {
     fun sendFile(file : File, bos : BufferedOutputStream, bis : BufferedInputStream) :  Result
-    fun sendCommand(cmd : String, bos : BufferedInputStream, bis : BufferedInputStream) : Result
-    fun sendDir(path : String, bos : BufferedInputStream, bis : BufferedInputStream) : Result
+    fun sendCommand(cmd : String, bos : BufferedOutputStream, bis : BufferedInputStream) : Result
+    fun sendDir(path : String, bos : BufferedOutputStream, bis : BufferedInputStream) : Result
+    fun recvFile(fileName : String, size : Long, bos : BufferedOutputStream, bis : BufferedInputStream) : Result
+    fun recvCommand(bos : BufferedOutputStream, bis : BufferedInputStream) : Result
 }

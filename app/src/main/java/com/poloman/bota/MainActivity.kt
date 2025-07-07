@@ -37,55 +37,94 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.app.ActivityCompat
+import com.poloman.bota.network.NetworkService
 import com.poloman.bota.service.MonitorService
+import com.poloman.bota.service.OnFileDiscovered
 import com.poloman.bota.ui.theme.BotaTheme
+import java.io.File
 
 class MainActivity : ComponentActivity() {
 
     @RequiresApi(Build.VERSION_CODES.R)
-    val requestSettingLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()){
-        result : ActivityResult ->
-        if(Environment.isExternalStorageManager())
-        {
-            Log.d("PER_SET",Environment.getRootDirectory().path)
-            monitor()
-        }
-        else{
-            //show user error
-            Log.d("PER_SET","Setting not granted")
+    val requestSettingLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
+            if (Environment.isExternalStorageManager()) {
+                Log.d("PER_SET", Environment.getRootDirectory().path)
+                monitor()
+            } else {
+                //show user error
+                Log.d("PER_SET", "Setting not granted")
+            }
+
         }
 
-    }
+    val permissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            if (isGranted) {
+                Log.d("PER_PER", "Permission granted")
+                Intent(applicationContext, MonitorService::class.java).also {
+                    it.action = MonitorService.Action.START_MONITOR.toString()
+                    startForegroundService(it)
+                }
+            } else {
 
-    val permissionLauncher  = registerForActivityResult(ActivityResultContracts.RequestPermission()){
-        isGranted : Boolean ->
-        if(isGranted){
-            Log.d("PER_PER","Permission granted")
-            Intent(applicationContext, MonitorService::class.java).also {
-                it.action = MonitorService.Action.START_MONITOR.toString()
-                startForegroundService(it)
             }
         }
-        else{
 
-        }
-    }
-
-     var monitorService: MonitorService? = null
+    var monitorService: MonitorService? = null
+    var networkService: NetworkService? = null
 
 
-    private val connection = object : ServiceConnection{
+    private val connection = object : ServiceConnection {
         override fun onServiceConnected(
             name: ComponentName?,
             service: IBinder?
         ) {
             monitorService = (service as MonitorService.MonitorServiceBinder).getService()
-            Log.d("PER_BND","Service bound")
+            Log.d("PER_BND", "Service bound")
+            startNetService()
+
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             monitorService = null
-            Log.d("PER_BND","Service Unbound")
+            Log.d("PER_BND", "Service Unbound")
+        }
+
+    }
+
+    private val netConnection = object : ServiceConnection {
+        override fun onServiceConnected(
+            name: ComponentName?,
+            service: IBinder?
+        ) {
+            networkService = (service as NetworkService.NetworkServiceBinder).getService()
+            Log.d("BTU_BND", "Service bound")
+            monitorService!!.setOnFileDiscoveredCallback(object : OnFileDiscovered {
+                override fun onFileDiscovered(fileName: String) {
+                    Log.d("BTU_RV",networkService!!.botaServer.botaClient.recv())
+                }
+
+                override fun onDirDiscovered(dirName: String) {
+                    networkService!!.botaServer.botaClient.sendDir(dirName)
+                    Log.d("BTU_RV",networkService!!.botaServer.botaClient.recv())
+                }
+
+                override fun onFileDiscovered(file: File) {
+                    if(file.exists()){
+                        Log.d("BTU_SEND_FILE","Sending ${file.name}")
+                        networkService!!.botaServer.botaClient.sendFile(file)
+
+                    }
+                }
+
+            })
+
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            networkService = null
+            Log.d("BTU_BND", "Service Unbound")
         }
 
     }
@@ -98,13 +137,35 @@ class MainActivity : ComponentActivity() {
             BotaTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
 
-                    Column(modifier = Modifier.fillMaxSize().padding(innerPadding),
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding),
                         verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally) {
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                         Button(onClick = {
                             askPermission()
                         }) {
-                            Text("Click")
+                            Text("Start Server")
+                        }
+
+                        Button(onClick = {
+                            monitorService?.let { it.initMonitoring() }
+                        }) {
+                            Text("Star monitoring")
+                        }
+
+                        Button(onClick = {
+                            monitorService?.let {
+                                it.isActive = false
+                                it.stopSelf()
+                            }
+                            networkService?.let {
+                                it.stopSelf()
+                            }
+                        } ) {
+                            Text("Stop")
                         }
                     }
                 }
@@ -114,29 +175,34 @@ class MainActivity : ComponentActivity() {
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
-    fun askPermission(){
-        if(!Environment.isExternalStorageManager()){
+    fun askPermission() {
+        if (!Environment.isExternalStorageManager()) {
             requestSettingLauncher.launch(Intent(ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
-        }
-        else{
-            Log.d("PER_SET",Environment.getRootDirectory().path)
+        } else {
+            Log.d("PER_SET", Environment.getRootDirectory().path)
             monitor()
         }
     }
 
-    fun monitor(){
-        if(checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED){
+    fun monitor() {
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
             Intent(applicationContext, MonitorService::class.java).also {
                 it.action = MonitorService.Action.START_MONITOR.toString()
                 startForegroundService(it)
             }
-        }
-        else{
+        } else {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
 
-        bindService(Intent(this, MonitorService::class.java),connection,BIND_ABOVE_CLIENT)
+        bindService(Intent(this, MonitorService::class.java), connection, BIND_ABOVE_CLIENT)
     }
 
+    fun startNetService() {
+        Intent(applicationContext, NetworkService::class.java).also {
+            it.action = MonitorService.Action.START_MONITOR.toString()
+            startForegroundService(it)
+        }
+        bindService(Intent(this, NetworkService::class.java), netConnection, BIND_ABOVE_CLIENT)
+    }
 }

@@ -1,4 +1,4 @@
-package com.poloman.bota.service
+package com.poloman.bota.network
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -21,10 +21,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
-class MonitorService : Service() {
+class NetworkService : Service() {
 
-    inner class MonitorServiceBinder : Binder() {
-        fun getService(): MonitorService = this@MonitorService
+    inner class NetworkServiceBinder : Binder() {
+        fun getService(): NetworkService = this@NetworkService
     }
 
     enum class Action {
@@ -32,56 +32,34 @@ class MonitorService : Service() {
         STOP_MONITOR
     }
 
-    private val binder = MonitorServiceBinder()
+    private val binder = NetworkServiceBinder()
     private lateinit var notificationManager: NotificationManager
-    var onFileDiscovered: OnFileDiscovered? = null
-    var isActive = false
+
+    lateinit var botaServer: BotaServer
 
     override fun onBind(intent: Intent?): IBinder? {
-        isActive = true
         return binder
     }
 
     override fun onCreate() {
         super.onCreate()
-        Log.d("PER_SER", "On Create called")
+        Log.d("BTU_NET", "On Create called")
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         startForeground()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d("PER_SER", "On Start called")
-//        initMonitoring()
+        Log.d("BTU_NET", "On Start called")
+        initServer()
         return START_STICKY
     }
 
-     fun initMonitoring() {
+    private fun initServer() {
         CoroutineScope(Dispatchers.IO).launch {
-            monitor(Environment.getExternalStorageDirectory().path)
+            botaServer =  BotaServer(3443)
         }
     }
 
-    private fun monitor(path: String, pathLevel: String = "=") {
-        if(!isActive){
-            return
-        }
-        Log.d("PER_MON", "$pathLevel$path")
-        onFileDiscovered!!.onDirDiscovered(path)
-
-        val file = File(path)
-        if (file.isDirectory) {
-            file.listFiles()?.let {
-                it.forEach { f ->
-                    if (f.isDirectory) {
-                        monitor(f.path, "$pathLevel=")
-                    } else if (f.isFile) {
-                        Log.d("PER_MON", "${f.name}")
-                        onFileDiscovered!!.onFileDiscovered(f)
-                    }
-                }
-            }
-        }
-    }
 
     private fun startForeground() {
 
@@ -91,8 +69,8 @@ class MonitorService : Service() {
 
             createServiceNotificationChannel()
             val notification: Notification = NotificationCompat.Builder(this, "CHANNEL_ID")
-                .setContentTitle("Foreground Service")
-                .setContentText("Foreground Service demonstration")
+                .setContentTitle("BoTA Network")
+                .setContentText("BoTA Server running")
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .build()
 
@@ -117,8 +95,10 @@ class MonitorService : Service() {
         notificationManager.createNotificationChannel(channel)
     }
 
-    fun setOnFileDiscoveredCallback(onFileDiscovered: OnFileDiscovered){
-        this.onFileDiscovered = onFileDiscovered
+    override fun onDestroy() {
+        super.onDestroy()
+        botaServer.stopServer()
+        Log.d("BTU_S","Destroyed")
     }
 }
 
