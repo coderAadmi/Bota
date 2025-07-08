@@ -1,6 +1,8 @@
 package com.poloman.bota.network
 
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -12,16 +14,19 @@ class BotaServer {
     private lateinit var serverSocket : ServerSocket
     private var port = 0
     private val clients = mutableMapOf<String, Socket>()
-    lateinit var botaClient: BotaClient
+    lateinit var botaClientHost: BotaClient
+    lateinit var botaClientServer : BotaClient
 
     private var isActive  = false
 
+    @RequiresApi(Build.VERSION_CODES.R)
     constructor(port : Int){
         this.port = port
         initServer()
     }
 
-    private fun initServer() {
+    @RequiresApi(Build.VERSION_CODES.R)
+     fun initServer() {
         try {
             serverSocket = ServerSocket(port)
             Log.d("BTU_SERVER","BTU Server Started")
@@ -33,6 +38,7 @@ class BotaServer {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     private fun acceptClients() {
         CoroutineScope(Dispatchers.IO).launch {
             while (isActive){
@@ -40,8 +46,10 @@ class BotaServer {
                     Log.d("BTU_SERVER","Waiting for client")
                     val client = serverSocket.accept()
 //                    clients.put("client",client)
-                    botaClient = BotaClient(client)
+                    botaClientHost = BotaClient(client)
                     Log.d("BTU_SERVER","connected to client : ${client.inetAddress}")
+                    botaClientServer = BotaClient(client.inetAddress.toString().substring(1),4334)
+
                     isActive = false
                 }
                 catch (e : Exception){
@@ -54,7 +62,7 @@ class BotaServer {
     fun stopServer(){
         try {
             isActive = false
-            botaClient.closeConnection()
+            botaClientHost.closeConnection()
             serverSocket.close()
         }
         catch (e : IOException){

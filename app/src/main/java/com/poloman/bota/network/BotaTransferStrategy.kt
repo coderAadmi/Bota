@@ -1,19 +1,21 @@
 package com.poloman.bota.network
 
+import android.os.Build
+import android.os.Environment
 import android.util.Log
+import androidx.annotation.RequiresApi
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
-import java.net.URLEncoder
 import java.nio.ByteBuffer
 
 class BotaTransferStrategy : SendStrategy {
 
-    val root = "testDir"
+    @RequiresApi(Build.VERSION_CODES.R)
+    val root = "${Environment.getExternalStorageDirectory().path}${File.separator}BotaStorage"
 
     override fun sendFile(
         file: File,
@@ -79,6 +81,7 @@ class BotaTransferStrategy : SendStrategy {
         return Result.Success
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     override fun recvFile(
         fileName: String,
         size: Long,
@@ -87,6 +90,7 @@ class BotaTransferStrategy : SendStrategy {
     ): Result {
         var totalBytesRead = 0L
         try {
+            File(root).mkdirs()
             val file = File("$root$fileName")
             file.createNewFile()
             val fos = FileOutputStream(file)

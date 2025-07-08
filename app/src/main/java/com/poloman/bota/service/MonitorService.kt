@@ -51,7 +51,6 @@ class MonitorService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("PER_SER", "On Start called")
-//        initMonitoring()
         return START_STICKY
     }
 
@@ -60,6 +59,7 @@ class MonitorService : Service() {
             monitor(Environment.getExternalStorageDirectory().path)
         }
     }
+
 
     private fun monitor(path: String, pathLevel: String = "=") {
         if(!isActive){

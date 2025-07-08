@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Environment
 import android.os.IBinder
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.poloman.bota.R
@@ -25,11 +26,6 @@ class NetworkService : Service() {
 
     inner class NetworkServiceBinder : Binder() {
         fun getService(): NetworkService = this@NetworkService
-    }
-
-    enum class Action {
-        START_MONITOR,
-        STOP_MONITOR
     }
 
     private val binder = NetworkServiceBinder()
@@ -50,14 +46,24 @@ class NetworkService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("BTU_NET", "On Start called")
-        initServer()
         return START_STICKY
     }
 
-    private fun initServer() {
+    @RequiresApi(Build.VERSION_CODES.R)
+     fun initServer() {
         CoroutineScope(Dispatchers.IO).launch {
             botaServer =  BotaServer(3443)
         }
+    }
+
+    fun sendFile(file : File){
+        Log.d("BTU_SEND_FILE","Sending ${file.name}")
+        botaServer.botaClientHost.sendFile(file)
+    }
+
+    fun sendDir(dirName : String){
+        botaServer.botaClientHost.sendDir(dirName)
+        Log.d("BTU_RV",botaServer.botaClientHost.recv().toString())
     }
 
 

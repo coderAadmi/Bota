@@ -10,37 +10,37 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.IBinder
 import android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
-import android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResult
-import androidx.activity.result.ActivityResultCallback
-import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.registerForActivityResult
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.core.app.ActivityCompat
+import androidx.navigation.compose.rememberNavController
 import com.poloman.bota.network.NetworkService
+import com.poloman.bota.screen.AppNavHost
+import com.poloman.bota.screen.Destination
 import com.poloman.bota.service.MonitorService
 import com.poloman.bota.service.OnFileDiscovered
 import com.poloman.bota.ui.theme.BotaTheme
+import com.poloman.bota.views.HomePage
 import java.io.File
 
 class MainActivity : ComponentActivity() {
@@ -100,24 +100,17 @@ class MainActivity : ComponentActivity() {
         ) {
             networkService = (service as NetworkService.NetworkServiceBinder).getService()
             Log.d("BTU_BND", "Service bound")
-            monitorService!!.setOnFileDiscoveredCallback(object : OnFileDiscovered {
-                override fun onFileDiscovered(fileName: String) {
-                    Log.d("BTU_RV",networkService!!.botaServer.botaClient.recv())
-                }
 
+            monitorService!!.setOnFileDiscoveredCallback(object : OnFileDiscovered {
                 override fun onDirDiscovered(dirName: String) {
-                    networkService!!.botaServer.botaClient.sendDir(dirName)
-                    Log.d("BTU_RV",networkService!!.botaServer.botaClient.recv())
+                    networkService?.let { it.sendDir(dirName) }
                 }
 
                 override fun onFileDiscovered(file: File) {
-                    if(file.exists()){
-                        Log.d("BTU_SEND_FILE","Sending ${file.name}")
-                        networkService!!.botaServer.botaClient.sendFile(file)
-
+                    if (file.exists()) {
+                        networkService?.let { it.sendFile(file) }
                     }
                 }
-
             })
 
         }
@@ -135,47 +128,47 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             BotaTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                val navController = rememberNavController()
+                val startDestination = Destination.HOME
+                var selectedDestination = 0
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Button(onClick = {
-                            askPermission()
-                        }) {
-                            Text("Start Server")
-                        }
-
-                        Button(onClick = {
-                            monitorService?.let { it.initMonitoring() }
-                        }) {
-                            Text("Star monitoring")
-                        }
-
-                        Button(onClick = {
-                            monitorService?.let {
-                                it.isActive = false
-                                it.stopSelf()
+                Scaffold(modifier = Modifier
+                    .fillMaxSize().background(Color.Gray),
+                    bottomBar = {
+                        NavigationBar(windowInsets = NavigationBarDefaults.windowInsets,
+                            containerColor = Color(0xFFF7FAFC)) {
+                            Destination.entries.forEachIndexed { index, destination ->
+                                NavigationBarItem(
+                                    selected = selectedDestination == index,
+                                    onClick = {
+                                        navController.navigate(route = destination.route)
+                                        selectedDestination = index
+                                    },
+                                    icon = {
+                                        Icon(
+                                            destination.icon,
+                                            contentDescription = destination.contentDescription
+                                        )
+                                    },
+                                    label = { Text(destination.label) }
+                                )
                             }
-                            networkService?.let {
-                                it.stopSelf()
-                            }
-                        } ) {
-                            Text("Stop")
                         }
+
                     }
+                ) { innerPadding ->
+                    Column(modifier = Modifier.padding(innerPadding)) {
+                        AppNavHost(navController,startDestination, Modifier.padding(innerPadding)) }
                 }
             }
         }
 
+        startMonitorService()
+
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
-    fun askPermission() {
+    fun startMonitorService() {
         if (!Environment.isExternalStorageManager()) {
             requestSettingLauncher.launch(Intent(ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
         } else {
