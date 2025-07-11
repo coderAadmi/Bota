@@ -11,17 +11,17 @@ import android.os.Environment
 import android.os.IBinder
 import android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -29,20 +29,27 @@ import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.navigation.compose.rememberNavController
+import com.poloman.bota.network.BotaServer
+import com.poloman.bota.network.NetworkResponse
 import com.poloman.bota.network.NetworkService
 import com.poloman.bota.screen.AppNavHost
 import com.poloman.bota.screen.Destination
+import com.poloman.bota.screen.PermissionDialog
 import com.poloman.bota.service.MonitorService
 import com.poloman.bota.service.OnFileDiscovered
 import com.poloman.bota.ui.theme.BotaTheme
-import com.poloman.bota.views.HomePage
+import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     @RequiresApi(Build.VERSION_CODES.R)
@@ -81,14 +88,14 @@ class MainActivity : ComponentActivity() {
             service: IBinder?
         ) {
             monitorService = (service as MonitorService.MonitorServiceBinder).getService()
-            Log.d("PER_BND", "Service bound")
-            startNetService()
+            Log.d("PER_BND", "Monitor Service bound")
+
 
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             monitorService = null
-            Log.d("PER_BND", "Service Unbound")
+            Log.d("PER_BND", "Monitor Service Unbound")
         }
 
     }
@@ -99,28 +106,45 @@ class MainActivity : ComponentActivity() {
             service: IBinder?
         ) {
             networkService = (service as NetworkService.NetworkServiceBinder).getService()
-            Log.d("BTU_BND", "Service bound")
+            Log.d("BTU_BND", "Net Service bound")
 
-            monitorService!!.setOnFileDiscoveredCallback(object : OnFileDiscovered {
-                override fun onDirDiscovered(dirName: String) {
-                    networkService?.let { it.sendDir(dirName) }
-                }
-
-                override fun onFileDiscovered(file: File) {
-                    if (file.exists()) {
-                        networkService?.let { it.sendFile(file) }
+            networkService?.let { service ->
+                service.permissionCallback = object : NetworkService.PermissionCallback{
+                    override fun onConnectionRequest( from : String, ip : String){
+                        vm.setNetworkServiceState(NetworkResponse.ConnectionRequest(from,ip))
                     }
+
+                    override fun onDataIncomingRequest() {
+                        TODO("Not yet implemented")
+                    }
+
                 }
-            })
+            }
+
+            monitorService?.let { service ->
+                service.setOnFileDiscoveredCallback(object : OnFileDiscovered {
+                    override fun onDirDiscovered(dirName: String) {
+                        networkService?.let { it.sendDir(dirName) }
+                    }
+
+                    override fun onFileDiscovered(file: File) {
+                        if (file.exists()) {
+                            networkService?.let { it.sendFile(file) }
+                        }
+                    }
+                })
+            }
 
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             networkService = null
-            Log.d("BTU_BND", "Service Unbound")
+            Log.d("BTU_BND", "Network Service Unbound")
         }
 
     }
+
+    val vm  by viewModels<QrViewModel>()
 
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -130,7 +154,7 @@ class MainActivity : ComponentActivity() {
             BotaTheme {
                 val navController = rememberNavController()
                 val startDestination = Destination.HOME
-                var selectedDestination = 0
+                var selectedDestination by remember { mutableStateOf(0) }
 
                 Scaffold(modifier = Modifier
                     .fillMaxSize().background(Color.Gray),
@@ -147,7 +171,7 @@ class MainActivity : ComponentActivity() {
                                     icon = {
                                         Icon(
                                             destination.icon,
-                                            contentDescription = destination.contentDescription
+                                            contentDescription = ""
                                         )
                                     },
                                     label = { Text(destination.label) }
@@ -157,13 +181,48 @@ class MainActivity : ComponentActivity() {
 
                     }
                 ) { innerPadding ->
+
+
+                    when(vm.getNetWorkActionState().collectAsState().value){
+                        is BotaRepository.NetworkAction.CONNECT_TO_CLIENT -> {
+                            host: String ->
+                            networkService?.let { it.connectToServer(host) }
+
+                        }
+                        BotaRepository.NetworkAction.NOT_STARTED -> {
+
+                        }
+                        BotaRepository.NetworkAction.START_SERVER -> {
+                            networkService?.let {
+                                Log.d("BOTA_SS","Trying to start")
+                                it.initServer() }
+                        }
+                    }
+
+                    networkService?.let {
+                        when(it.getServerState().collectAsState().value){
+                            is BotaServer.ServerState.Error -> {
+
+                            }
+                            BotaServer.ServerState.Running -> {
+                                vm.generateQrCode()
+                            }
+                            BotaServer.ServerState.Stopped -> {
+
+                            }
+                        }
+                    }
+
                     Column(modifier = Modifier.padding(innerPadding)) {
-                        AppNavHost(navController,startDestination, Modifier.padding(innerPadding)) }
+                        PermissionDialog(modifier = Modifier, vm, networkService!!)
+                        AppNavHost(navController,startDestination, Modifier.padding(innerPadding))
+                    }
                 }
             }
         }
 
         startMonitorService()
+        startNetService()
 
     }
 
@@ -197,5 +256,22 @@ class MainActivity : ComponentActivity() {
             startForegroundService(it)
         }
         bindService(Intent(this, NetworkService::class.java), netConnection, BIND_ABOVE_CLIENT)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            if(netConnection!= null){
+                unbindService(netConnection)
+            }
+            if(connection!= null){
+                unbindService(connection)
+            }
+
+            monitorService?.let{it.stopSelf()}
+        }
+        catch (e : Exception){
+
+        }
     }
 }
