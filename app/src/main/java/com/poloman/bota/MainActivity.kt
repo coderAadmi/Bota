@@ -10,85 +10,142 @@ import android.os.Bundle
 import android.os.Environment
 import android.os.IBinder
 import android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
-import android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResult
-import androidx.activity.result.ActivityResultCallback
-import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.registerForActivityResult
+import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarDefaults
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.core.app.ActivityCompat
+import androidx.core.net.toFile
+import androidx.navigation.compose.rememberNavController
+import com.poloman.bota.network.BotaServer
+import com.poloman.bota.network.NetworkResponse
+import com.poloman.bota.network.NetworkService
+import com.poloman.bota.screen.AppNavHost
+import com.poloman.bota.screen.Destination
+import com.poloman.bota.screen.PermissionDialog
 import com.poloman.bota.service.MonitorService
+import com.poloman.bota.service.OnFileDiscovered
 import com.poloman.bota.ui.theme.BotaTheme
+import dagger.hilt.android.AndroidEntryPoint
+import java.io.File
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     @RequiresApi(Build.VERSION_CODES.R)
-    val requestSettingLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()){
-        result : ActivityResult ->
-        if(Environment.isExternalStorageManager())
-        {
-            Log.d("PER_SET",Environment.getRootDirectory().path)
-            monitor()
-        }
-        else{
-            //show user error
-            Log.d("PER_SET","Setting not granted")
+    val requestSettingLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
+            if (Environment.isExternalStorageManager()) {
+                Log.d("PER_SET", Environment.getRootDirectory().path)
+                monitor()
+            } else {
+                //show user error
+                Log.d("PER_SET", "Setting not granted")
+            }
+
         }
 
-    }
+    val permissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+            if (isGranted) {
+                Log.d("PER_PER", "Permission granted")
+                Intent(applicationContext, MonitorService::class.java).also {
+                    it.action = MonitorService.Action.START_MONITOR.toString()
+                    startForegroundService(it)
+                }
+            } else {
 
-    val permissionLauncher  = registerForActivityResult(ActivityResultContracts.RequestPermission()){
-        isGranted : Boolean ->
-        if(isGranted){
-            Log.d("PER_PER","Permission granted")
-            Intent(applicationContext, MonitorService::class.java).also {
-                it.action = MonitorService.Action.START_MONITOR.toString()
-                startForegroundService(it)
             }
         }
-        else{
 
-        }
-    }
-
-     var monitorService: MonitorService? = null
+    var monitorService: MonitorService? = null
+    var networkService: NetworkService? = null
 
 
-    private val connection = object : ServiceConnection{
+    private val connection = object : ServiceConnection {
         override fun onServiceConnected(
             name: ComponentName?,
             service: IBinder?
         ) {
             monitorService = (service as MonitorService.MonitorServiceBinder).getService()
-            Log.d("PER_BND","Service bound")
+            Log.d("PER_BND", "Monitor Service bound")
+
+
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             monitorService = null
-            Log.d("PER_BND","Service Unbound")
+            Log.d("PER_BND", "Monitor Service Unbound")
         }
 
     }
+
+    private val netConnection = object : ServiceConnection {
+        override fun onServiceConnected(
+            name: ComponentName?,
+            service: IBinder?
+        ) {
+            networkService = (service as NetworkService.NetworkServiceBinder).getService()
+            Log.d("BTU_BND", "Net Service bound")
+
+            networkService?.let { service ->
+                service.permissionCallback = object : NetworkService.PermissionCallback{
+                    override fun onConnectionRequest( from : String, ip : String){
+                        vm.setNetworkServiceState(NetworkResponse.ConnectionRequest(from,ip))
+                    }
+
+                    override fun onDataIncomingRequest(from : String, ip : String, fName : String, size : Long) {
+                        vm.setNetworkServiceState(NetworkResponse.IncomingDataRequest(from,ip,fName, size))
+                    }
+
+                }
+            }
+
+            monitorService?.let { service ->
+                service.setOnFileDiscoveredCallback(object : OnFileDiscovered {
+                    override fun onDirDiscovered(dirName: String) {
+//                        networkService?.let { it.sendDir(dirName) }
+                    }
+
+                    override fun onFileDiscovered(file: File) {
+                        if (file.exists()) {
+//                            networkService?.let { it.sendFile(file) }
+                        }
+                    }
+                })
+            }
+
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            networkService = null
+            Log.d("BTU_BND", "Network Service Unbound")
+        }
+
+    }
+
+    val vm  by viewModels<QrViewModel>()
 
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -96,47 +153,163 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             BotaTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                val navController = rememberNavController()
+                val startDestination = Destination.HOME
+                var selectedDestination by remember { mutableStateOf(0) }
 
-                    Column(modifier = Modifier.fillMaxSize().padding(innerPadding),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally) {
-                        Button(onClick = {
-                            askPermission()
-                        }) {
-                            Text("Click")
+                Scaffold(modifier = Modifier
+                    .fillMaxSize().background(Color.Gray),
+                    bottomBar = {
+                        NavigationBar(windowInsets = NavigationBarDefaults.windowInsets,
+                            containerColor = Color(0xFFF7FAFC)) {
+                            Destination.entries.forEachIndexed { index, destination ->
+                                NavigationBarItem(
+                                    selected = selectedDestination == index,
+                                    onClick = {
+                                        navController.navigate(route = destination.route)
+                                        selectedDestination = index
+                                    },
+                                    icon = {
+                                        Icon(
+                                            destination.icon,
+                                            contentDescription = ""
+                                        )
+                                    },
+                                    label = { Text(destination.label) }
+                                )
+                            }
                         }
+
+                    }
+                ) { innerPadding ->
+
+
+                    when(vm.getNetWorkActionState().collectAsState().value){
+                        is BotaRepository.NetworkAction.CONNECT_TO_CLIENT -> {
+                            host: String ->
+                            networkService?.let { it.connectToServer(host) }
+
+                        }
+                        BotaRepository.NetworkAction.NOT_STARTED -> {
+
+                        }
+                        BotaRepository.NetworkAction.START_SERVER -> {
+                            networkService?.let {
+                                it.initServer()
+                            }
+                        }
+
+                        BotaRepository.NetworkAction.STARTED -> {
+
+                        }
+                    }
+
+                    networkService?.let {
+                        when(it.getServerState().collectAsState().value){
+                            is BotaServer.ServerState.Error -> {
+
+                            }
+                            BotaServer.ServerState.Running -> {
+                                vm.generateQrCode()
+                            }
+                            BotaServer.ServerState.Stopped -> {
+
+                            }
+                        }
+                    }
+
+                    Column(modifier = Modifier.padding(innerPadding)) {
+                        when(vm.userSelectorState.collectAsState().value){
+                            true -> {
+                                networkService?.let {
+                                    it.getConnectedUsers().forEach { user ->
+                                        Log.d("BOTA_USER_LIST", "${user.uname} : ${user.ip}")
+                                            networkService?.sendFiles(user.ip,vm.getSelectedFiles().value)
+                                    }
+                                }
+                                vm.hideUserSelector()
+                            }
+                            false -> {
+
+                            }
+                        }
+                        PermissionDialog(modifier = Modifier, vm.getNetworkResponseState(), onAccept = { ip : String ->
+                            networkService?.acceptConnection(ip)
+                            vm.setNetworkServiceState(NetworkResponse.Nothing)
+                        },
+                            onDeny = { ip :String ->
+                                networkService?.denyConnection(ip)
+                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                            },
+
+                            onFileAccept = { ip  : String, fname : String, size : Long ->
+                                networkService?.acceptFile(ip, fileName = fname, size = size)
+                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                            },
+
+                            onFileDeny = { ip : String ->
+                                networkService?.denyFile(ip)
+                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                            }
+
+                            )
+                        AppNavHost(navController,startDestination, Modifier.padding(innerPadding))
                     }
                 }
             }
         }
 
+        startMonitorService()
+        startNetService()
+
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
-    fun askPermission(){
-        if(!Environment.isExternalStorageManager()){
+    fun startMonitorService() {
+        if (!Environment.isExternalStorageManager()) {
             requestSettingLauncher.launch(Intent(ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
-        }
-        else{
-            Log.d("PER_SET",Environment.getRootDirectory().path)
+        } else {
+            Log.d("PER_SET", Environment.getRootDirectory().path)
             monitor()
         }
     }
 
-    fun monitor(){
-        if(checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED){
+    fun monitor() {
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
             Intent(applicationContext, MonitorService::class.java).also {
                 it.action = MonitorService.Action.START_MONITOR.toString()
                 startForegroundService(it)
             }
-        }
-        else{
+        } else {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
 
-        bindService(Intent(this, MonitorService::class.java),connection,BIND_ABOVE_CLIENT)
+        bindService(Intent(this, MonitorService::class.java), connection, BIND_ABOVE_CLIENT)
     }
 
+    fun startNetService() {
+        Intent(applicationContext, NetworkService::class.java).also {
+            it.action = MonitorService.Action.START_MONITOR.toString()
+            startForegroundService(it)
+        }
+        bindService(Intent(this, NetworkService::class.java), netConnection, BIND_ABOVE_CLIENT)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            if(netConnection!= null){
+                unbindService(netConnection)
+            }
+            if(connection!= null){
+                unbindService(connection)
+            }
+
+            monitorService?.let{it.stopSelf()}
+        }
+        catch (e : Exception){
+
+        }
+    }
 }
