@@ -16,11 +16,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 import com.poloman.bota.views.TransferPage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TransferScreen(){
+fun TransferScreen(navController: NavController){
     Column(modifier = Modifier.fillMaxSize().padding(bottom = 1.dp)){
         CenterAlignedTopAppBar(title = {Text(text = "Files", fontWeight = FontWeight.Bold)},
             windowInsets = WindowInsets(0.dp),
@@ -31,6 +32,6 @@ fun TransferScreen(){
                 }
             }
         )
-        TransferPage()
+        TransferPage(navController)
     }
 }

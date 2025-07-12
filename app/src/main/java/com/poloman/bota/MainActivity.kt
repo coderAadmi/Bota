@@ -36,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.core.net.toFile
 import androidx.navigation.compose.rememberNavController
 import com.poloman.bota.network.BotaServer
 import com.poloman.bota.network.NetworkResponse
@@ -114,8 +115,8 @@ class MainActivity : ComponentActivity() {
                         vm.setNetworkServiceState(NetworkResponse.ConnectionRequest(from,ip))
                     }
 
-                    override fun onDataIncomingRequest() {
-                        TODO("Not yet implemented")
+                    override fun onDataIncomingRequest(from : String, ip : String, fName : String, size : Long) {
+                        vm.setNetworkServiceState(NetworkResponse.IncomingDataRequest(from,ip,fName, size))
                     }
 
                 }
@@ -124,12 +125,12 @@ class MainActivity : ComponentActivity() {
             monitorService?.let { service ->
                 service.setOnFileDiscoveredCallback(object : OnFileDiscovered {
                     override fun onDirDiscovered(dirName: String) {
-                        networkService?.let { it.sendDir(dirName) }
+//                        networkService?.let { it.sendDir(dirName) }
                     }
 
                     override fun onFileDiscovered(file: File) {
                         if (file.exists()) {
-                            networkService?.let { it.sendFile(file) }
+//                            networkService?.let { it.sendFile(file) }
                         }
                     }
                 })
@@ -194,8 +195,12 @@ class MainActivity : ComponentActivity() {
                         }
                         BotaRepository.NetworkAction.START_SERVER -> {
                             networkService?.let {
-                                Log.d("BOTA_SS","Trying to start")
-                                it.initServer() }
+                                it.initServer()
+                            }
+                        }
+
+                        BotaRepository.NetworkAction.STARTED -> {
+
                         }
                     }
 
@@ -214,7 +219,40 @@ class MainActivity : ComponentActivity() {
                     }
 
                     Column(modifier = Modifier.padding(innerPadding)) {
-                        PermissionDialog(modifier = Modifier, vm, networkService!!)
+                        when(vm.userSelectorState.collectAsState().value){
+                            true -> {
+                                networkService?.let {
+                                    it.getConnectedUsers().forEach { user ->
+                                        Log.d("BOTA_USER_LIST", "${user.uname} : ${user.ip}")
+                                            networkService?.sendFiles(user.ip,vm.getSelectedFiles().value)
+                                    }
+                                }
+                                vm.hideUserSelector()
+                            }
+                            false -> {
+
+                            }
+                        }
+                        PermissionDialog(modifier = Modifier, vm.getNetworkResponseState(), onAccept = { ip : String ->
+                            networkService?.acceptConnection(ip)
+                            vm.setNetworkServiceState(NetworkResponse.Nothing)
+                        },
+                            onDeny = { ip :String ->
+                                networkService?.denyConnection(ip)
+                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                            },
+
+                            onFileAccept = { ip  : String, fname : String, size : Long ->
+                                networkService?.acceptFile(ip, fileName = fname, size = size)
+                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                            },
+
+                            onFileDeny = { ip : String ->
+                                networkService?.denyFile(ip)
+                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                            }
+
+                            )
                         AppNavHost(navController,startDestination, Modifier.padding(innerPadding))
                     }
                 }

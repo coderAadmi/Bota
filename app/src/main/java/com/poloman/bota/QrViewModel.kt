@@ -1,6 +1,7 @@
 package com.poloman.bota
 
 import android.graphics.drawable.Drawable
+import android.net.Uri
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -50,4 +51,22 @@ class QrViewModel @Inject constructor(private val repository: BotaRepository) : 
     fun getNetworkResponseState(): StateFlow<NetworkResponse> {
         return repository.networkResponseState
     }
+
+    fun setSelectedFiles(uris: List<Uri>) {
+        repository.setSelectedFilesState(uris)
+    }
+
+    fun getSelectedFiles(): StateFlow<List<Uri>> {
+        return repository.getSelectedFilesState()
+    }
+
+    fun showUserSelector() {
+        repository.showUserSelector()
+    }
+
+    fun hideUserSelector(){
+        repository.hideUserSelector()
+    }
+
+    val userSelectorState = repository.userSelectorState
 }

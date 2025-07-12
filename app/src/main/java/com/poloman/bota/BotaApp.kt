@@ -1,4 +1,8 @@
 package com.poloman.bota
 
-class BotaApp {
+import android.app.Application
+import dagger.hilt.android.HiltAndroidApp
+
+@HiltAndroidApp
+class BotaApp : Application() {
 }

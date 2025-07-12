@@ -1,12 +1,20 @@
 package com.poloman.bota
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
 enum class FileType{
-    MUSIC,
-    PHOTO,
-    VIDEO,
-    DOC,
-    OTHER
+    Photo,
+    Videos,
+    Music,
+    Documents,
+    Others
 }
 
-data class dev_store(
-    val fileName : String, val type : Int, val lastModified : String )
+@Entity(tableName = "dev_Store")
+data class BotaFile(
+    @PrimaryKey(autoGenerate = false)
+    val pathAndName : String,
+    val fileName : String,
+    val type : Int,
+    val lastModified : Long )

@@ -15,7 +15,7 @@ import java.nio.ByteBuffer
 class BotaTransferStrategy : SendStrategy {
 
     @RequiresApi(Build.VERSION_CODES.R)
-    val root = "${Environment.getExternalStorageDirectory().path}${File.separator}BotaStorage"
+    val root = "${Environment.getExternalStorageDirectory().path}${File.separator}BotaStorage${File.separator}"
 
     override fun sendFile(
         file: File,
@@ -23,7 +23,7 @@ class BotaTransferStrategy : SendStrategy {
         bis: BufferedInputStream
     ): Result {
         val ftSize = 2048
-        val filePath = "${file.path}"
+        val filePath = "${file.name}"
         sendCommand("RCV_FILE $filePath",bos,bis)
         var reply = recvCommand(bos,bis) as Result.CommandResponse
         if(reply.result.equals("SND_SIZE")){
@@ -52,6 +52,8 @@ class BotaTransferStrategy : SendStrategy {
 
             }
             catch (e : IOException){
+                // clear the bos, send something so that receiver reads -1 bytes
+                Log.d("BTU_IO_ERROR",e.toString())
                 return Result.Error(e)
             }
         }
@@ -81,6 +83,7 @@ class BotaTransferStrategy : SendStrategy {
         return Result.Success
     }
 
+
     @RequiresApi(Build.VERSION_CODES.R)
     override fun recvFile(
         fileName: String,
@@ -88,10 +91,14 @@ class BotaTransferStrategy : SendStrategy {
         bos: BufferedOutputStream,
         bis: BufferedInputStream
     ): Result {
+
         var totalBytesRead = 0L
         try {
-            File(root).mkdirs()
             val file = File("$root$fileName")
+            try {
+                file.parentFile.mkdirs()
+            }
+            catch (e: Exception) {}
             file.createNewFile()
             val fos = FileOutputStream(file)
 
@@ -146,6 +153,16 @@ class BotaTransferStrategy : SendStrategy {
             val read = this.read(buf, offset + total, length - total)
             if (read == -1) throw IOException("Stream closed prematurely")
             total += read
+        }
+    }
+
+    fun askPermissionToSendFile(file : File, bos : BufferedOutputStream, bis : BufferedInputStream) {
+        sendCommand("FILE_INCOMING_PERMISSION ${file.name}", bos ,bis)
+        sendCommand("FILE_SIZE ${file.length()}",bos, bis)
+        val reply = recvCommand(bos,bis) as Result.CommandResponse
+
+        if(reply.result.equals("OK ${file.name}")){
+            sendFile(file, bos, bis)
         }
     }
 }

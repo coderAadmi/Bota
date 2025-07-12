@@ -2,6 +2,7 @@ package com.poloman.bota
 
 import android.content.Context
 import android.graphics.drawable.Drawable
+import android.net.Uri
 import androidx.core.content.ContextCompat
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
@@ -30,6 +31,7 @@ class BotaRepository @Inject constructor(private val appContext : Context,
         object START_SERVER : NetworkAction()
         data class  CONNECT_TO_CLIENT(val host : String) : NetworkAction()
         object NOT_STARTED : NetworkAction()
+        object STARTED : NetworkAction()
     }
 
     private val _qrCodeDrawable = MutableStateFlow<Drawable?>(null)
@@ -93,6 +95,26 @@ class BotaRepository @Inject constructor(private val appContext : Context,
     val networkResponseState = _networkResponseState.asStateFlow()
     fun setNetworkServiceState(request: NetworkResponse) {
         _networkResponseState.value = request
+    }
+
+    private val _selectedFiles = MutableStateFlow<List<Uri>>(emptyList())
+    val selectedFilesFlow = _selectedFiles.asStateFlow()
+    fun setSelectedFilesState(uris: List<Uri>) {
+        _selectedFiles.value = uris
+    }
+
+    fun getSelectedFilesState(): StateFlow<List<Uri>> {
+        return selectedFilesFlow
+    }
+
+    private val _userSelectorState = MutableStateFlow<Boolean>(false)
+    val userSelectorState = _userSelectorState.asStateFlow()
+    fun showUserSelector() {
+        _userSelectorState.value = true
+    }
+
+    fun hideUserSelector(){
+        _userSelectorState.value = false
     }
 
 
