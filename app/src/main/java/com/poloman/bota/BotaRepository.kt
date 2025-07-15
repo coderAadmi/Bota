@@ -25,21 +25,10 @@ import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 class BotaRepository @Inject constructor(private val appContext : Context,
-    private val botaDb : BotaAppDb) {
-
-    sealed class NetworkAction{
-        object START_SERVER : NetworkAction()
-        data class  CONNECT_TO_CLIENT(val host : String) : NetworkAction()
-        object NOT_STARTED : NetworkAction()
-        object STARTED : NetworkAction()
-    }
+    private val botaDb : BotaAppDb ) {
 
     private val _qrCodeDrawable = MutableStateFlow<Drawable?>(null)
     val qrCodeDrawable = _qrCodeDrawable.asStateFlow()
-
-    private val _nsEvent = MutableStateFlow<NetworkAction>(NetworkAction.NOT_STARTED)
-    val networkAction : StateFlow<NetworkAction> = _nsEvent.asStateFlow()
-
 
     fun createQr(){
         val data = QrData.Url(Helper.getdeviceIpAddress())
@@ -71,13 +60,6 @@ class BotaRepository @Inject constructor(private val appContext : Context,
         _qrCodeDrawable.value = QrCodeDrawable(data,options)
     }
 
-    fun startServer() {
-        _nsEvent.value = NetworkAction.START_SERVER
-    }
-
-    fun connectToClient(hostAddress: String) {
-        _nsEvent.value = NetworkAction.CONNECT_TO_CLIENT(hostAddress)
-    }
 
     fun getFilesByType(fileType : Int) : Flow<PagingData<BotaFile>> {
         val pagingSourceFactory = {botaDb.getBotaDao().getPagedFilesByCount(fileType)}
@@ -86,9 +68,6 @@ class BotaRepository @Inject constructor(private val appContext : Context,
             pagingSourceFactory = pagingSourceFactory
         ).flow
     }
-
-    fun getFilesCountByType(viewModelScope: CoroutineScope, fileType : Int) : StateFlow<Int> =
-        botaDb.getBotaDao().getFileTypeCount(fileType).stateIn(viewModelScope, SharingStarted.Eagerly, 0)
 
 
     private val _networkResponseState = MutableStateFlow<NetworkResponse>(NetworkResponse.Nothing)

@@ -17,13 +17,10 @@ import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
-import androidx.core.net.toFile
 import com.poloman.bota.BotaUser
 import com.poloman.bota.R
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.io.File
@@ -35,12 +32,13 @@ class NetworkService : Service() {
     @RequiresApi(Build.VERSION_CODES.R)
     val root = "${Environment.getExternalStorageDirectory().path}${File.separator}BotaStorage${File.separator}"
 
-    interface PermissionCallback{
+    interface NetworkCallback{
         fun onConnectionRequest(from : String, ip : String)
         fun onDataIncomingRequest(from : String, ip : String, fileName : String, size : Long)
+        fun onServerStarted()
     }
 
-     var permissionCallback: PermissionCallback? = null
+     var networkCallback: NetworkCallback? = null
 
     inner class NetworkServiceBinder : Binder() {
         fun getService(): NetworkService = this@NetworkService
@@ -50,7 +48,7 @@ class NetworkService : Service() {
     private lateinit var notificationManager: NotificationManager
 
     val botaServer by lazy {
-        BotaServer(3443, permissionCallback!!)
+        BotaServer(3443, networkCallback!!)
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -162,7 +160,9 @@ class NetworkService : Service() {
     }
 
     fun connectToServer(hostServer: String) {
-
+        CoroutineScope(Dispatchers.IO).launch {
+            botaServer.connectToHost(hostServer)
+        }
     }
 
     fun sendMousePos(x: Int, y: Int) {

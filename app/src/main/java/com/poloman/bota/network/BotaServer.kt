@@ -3,7 +3,6 @@ package com.poloman.bota.network
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
-import androidx.compose.runtime.collectAsState
 import com.poloman.bota.BotaUser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,7 +13,6 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.IOException
 import java.net.ServerSocket
-import java.net.Socket
 
 class BotaServer {
 
@@ -24,7 +22,7 @@ class BotaServer {
         object Stopped : ServerState()
     }
 
-    lateinit var permissionCallback: NetworkService.PermissionCallback
+    lateinit var networkCallback: NetworkService.NetworkCallback
 
     private lateinit var serverSocket: ServerSocket
     private var port = 0
@@ -35,26 +33,56 @@ class BotaServer {
     val serverState: StateFlow<ServerState> = _serverState.asStateFlow()
 
     @RequiresApi(Build.VERSION_CODES.R)
-    constructor(port: Int, permissionCallback: NetworkService.PermissionCallback) {
+    constructor(port: Int, networkCallback: NetworkService.NetworkCallback) {
         this.port = port
-        this.permissionCallback = permissionCallback
+        this.networkCallback = networkCallback
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
     fun initServer() {
-        if (_serverState.value == ServerState.Running)
-            return
         try {
             serverSocket = ServerSocket(port)
             Log.d("BTU_SERVER", "BTU Server Started")
             Log.d("BTU_SERVER_DETAIL", " address : ${Helper.getdeviceIpAddress()} port : $port")
             isActive = true
+            networkCallback.onServerStarted()
             _serverState.value = ServerState.Running
             acceptClients()
         } catch (e: IOException) {
             Log.d("BTU_SERVER_INIT", "Exception ${e.toString()}")
             _serverState.value = ServerState.Error(e)
 
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.R)
+    fun connectToHost(hostAddress: String, port: Int = 3443) {
+        try {
+            val clientListener = BotaClient(hostAddress, port)
+            val clientCommander = BotaClient(hostAddress, port)
+            clientListener.startListening(
+                onNameAsked = { hostName ->
+                    if (clients.containsKey(clientCommander.getIpAddress())) {
+                        //inform user already connected
+                    } else {
+                        clients.put(
+                            clientCommander.getIpAddress(),
+                            BotaUser(
+                                uname = hostName, ip = clientCommander.getIpAddress(),
+                                commander = clientCommander,
+                                listener = clientListener,
+                                onDisconnected = { clientIp ->
+                                    Log.d("BTU_CLI_REMOVED", "Client $clientIp disconnected")
+                                    clients.remove(clientIp)
+                                }
+                            ).setCallback(networkCallback)
+                        )
+                    }
+                }
+            )
+
+        } catch (e: Exception) {
+            Log.d("BTU_CON2HOST", e.toString())
         }
     }
 
@@ -79,10 +107,14 @@ class BotaServer {
                             uname,
                             botaClientHost.getIpAddress(),
                             botaClientHost,
-                            botaClientServer
-                        ).setCallback(permissionCallback)
+                            botaClientServer,
+                            onDisconnected = {
+                                clientIp ->
+                                clients.remove(clientIp)
+                            }
+                        ).setCallback(networkCallback)
                     )
-                    permissionCallback.onConnectionRequest(uname, botaClientHost.getIpAddress())
+                    networkCallback.onConnectionRequest(uname, botaClientHost.getIpAddress())
                 } catch (e: Exception) {
                     Log.d("BTU_SERVER", "Exception ${e.toString()}")
                     botaClientHost?.closeConnection()

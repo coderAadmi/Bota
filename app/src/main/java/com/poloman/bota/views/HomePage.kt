@@ -1,8 +1,6 @@
 package com.poloman.bota.views
 
 import android.Manifest
-import android.content.Context.BIND_ABOVE_CLIENT
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -28,23 +26,33 @@ import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import androidx.core.content.ContextCompat
-import androidx.core.content.ContextCompat.startForegroundService
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.rememberImagePainter
 import com.poloman.bota.QrViewModel
-import com.poloman.bota.network.NetworkResponse
-import com.poloman.bota.network.NetworkService
-import com.poloman.bota.screen.PermissionDialog
-import com.poloman.bota.service.MonitorService
+import com.poloman.bota.network.Communicator
+import io.github.g00fy2.quickie.QRResult
 import io.github.g00fy2.quickie.ScanQRCode
 
 
-@Preview(showSystemUi = true)
 @Composable
-fun HomePage() {
+fun HomePage(communicator: Communicator) {
+    val qrVm = hiltViewModel<QrViewModel>()
+    val qrCodeResult = rememberLauncherForActivityResult(ScanQRCode()) { result : QRResult->
+        when(result){
+            is QRResult.QRError -> {
 
-    val qrCodeResult = rememberLauncherForActivityResult(ScanQRCode()) { result ->
-        Log.d("BOTA_QR", "QR Result $result")
+            }
+            QRResult.QRMissingPermission -> {
+
+            }
+            is QRResult.QRSuccess -> {
+                Log.d("BOTA_QR", "QR Result $result")
+                communicator.onConnectToServer(result.content.rawValue!!)
+            }
+            QRResult.QRUserCanceled -> {
+
+            }
+        }
     }
 
     val cameraPermissionLauncher =
@@ -63,7 +71,6 @@ fun HomePage() {
             .background(Color(0xFFF7FAFC))
     ) {
         val (title, strategy, genQR, scanQR, qrImg, permissionCard) = createRefs()
-        val qrVm = hiltViewModel<QrViewModel>()
         val context = LocalContext.current
 
 
@@ -87,7 +94,7 @@ fun HomePage() {
 
         Button(
             onClick = {
-                qrVm.startBotaServer()
+                communicator.onStartServer()
             },
             colors = ButtonDefaults
                 .buttonColors(containerColor = Color(0xFF0A80ED)), modifier = Modifier

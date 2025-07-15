@@ -30,6 +30,8 @@ class BotaClient {
 
     private var isListening = true
 
+    lateinit var onDisconnect : () -> Unit
+
     @RequiresApi(Build.VERSION_CODES.R)
     constructor(host : String, port : Int){
         this.host = host
@@ -37,13 +39,16 @@ class BotaClient {
         connectToServer()
     }
 
-    constructor(socket: Socket){
+    constructor(socket: Socket, onDisconnect : () -> Unit = {}){
         this.socket = socket
         this.host = ""
-
         bos = BufferedOutputStream(socket.outputStream)
         bos.flush()
         bis = BufferedInputStream(socket.inputStream)
+    }
+
+    fun setDisconnectCallback( onDisconnect : () -> Unit = {}){
+        this.onDisconnect = onDisconnect
     }
 
     fun setCallback(permissionCallback: BotaUser.BotaClientCallback){
@@ -60,15 +65,17 @@ class BotaClient {
         }
         catch (e : UnknownHostException){
             Log.d("BTU_CLI_UEX",e.toString())
+            onDisconnect()
         }
         catch (e : IOException){
             Log.d("BTU_CLI_IOEX",e.toString())
+            onDisconnect()
         }
     }
 
 
     @RequiresApi(Build.VERSION_CODES.R)
-    fun startListening(){
+    fun startListening(onNameAsked : (serverName : String) -> Unit = {}){
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 while (isListening) {
@@ -90,7 +97,10 @@ class BotaClient {
                         sendCommand("DIR_CREATED $fileName")
                     }
                     else if(result.result.startsWith("UNAME")){
+                        val serverName = result.result.substringAfter("UNAME ")
+                        Log.d("BTU_SENDING_NAME", "To server $serverName")
                         sendCommand("UNAME Poloman-Android")
+                        onNameAsked(serverName)
                     }
                     else if(result.result.startsWith("FILE_INCOMING_PERMISSION")){
                         val fileName = result.result.substringAfter("FILE_INCOMING_PERMISSION ")
@@ -103,6 +113,7 @@ class BotaClient {
             catch (e : Exception){
                 //socketException & IOException
                 Log.d("BTU_CLIENT","Disconnected ${e.toString()}")
+                onDisconnect()
             }
             //try catch
         }

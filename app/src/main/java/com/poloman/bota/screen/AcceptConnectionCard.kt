@@ -17,10 +17,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
-import com.poloman.bota.QrViewModel
 import com.poloman.bota.network.NetworkResponse
-import com.poloman.bota.network.NetworkService
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 

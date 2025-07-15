@@ -7,12 +7,14 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.poloman.bota.network.Communicator
 
 @Composable
 fun AppNavHost(
     navController: NavHostController,
     startDestination: Destination,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    communicator: Communicator
 ) {
     NavHost(
         navController,
@@ -21,8 +23,8 @@ fun AppNavHost(
         Destination.entries.forEach { destination ->
             composable(destination.route) {
                 when (destination) {
-                    Destination.HOME -> HomeScreen()
-                    Destination.TRANSFER -> TransferScreen(navController)
+                    Destination.HOME -> HomeScreen(communicator)
+                    Destination.TRANSFER -> TransferScreen(communicator)
                     Destination.SETTINGS -> SettingsScreen()
                 }
             }
