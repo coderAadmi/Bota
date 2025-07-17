@@ -164,5 +164,27 @@ class BotaTransferStrategy : SendStrategy {
         if(reply.result.equals("OK ${file.name}")){
             sendFile(file, bos, bis)
         }
+        else{
+            //denied
+        }
+    }
+
+    fun askPermissionToSendFiles(files : List<File>, bos : BufferedOutputStream, bis : BufferedInputStream) {
+        var totalFilesSize = 0L
+        files.forEach {
+            totalFilesSize += it.length()
+        }
+        sendCommand("MULTIPLE_FILE_INCOMING_PERMISSION ${files.size}", bos ,bis)
+        sendCommand("FILE_SIZE ${totalFilesSize}",bos, bis)
+        val reply = recvCommand(bos,bis) as Result.CommandResponse
+
+        if(reply.result.equals("OK $totalFilesSize")){
+            files.forEach {
+                sendFile(it, bos, bis)
+            }
+        }
+        else{
+            //denied
+        }
     }
 }

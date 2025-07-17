@@ -17,6 +17,7 @@ class BotaUser {
 
     interface BotaClientCallback{
         fun onFileIncomingRequest(filename : String, size : Long)
+        fun onMultipleFileIncomingRequest(fileCount : Int, size: Long)
     }
 
     constructor(uname : String, ip : String, commander : BotaClient, listener : BotaClient, onDisconnected : (ip : String) -> Unit){
@@ -43,12 +44,16 @@ class BotaUser {
             commander.closeConnection()
         }
         catch (e : Exception){
-
+            Log.d("BTU_CLOSE_CLIENT",e.toString())
         }
     }
 
     suspend fun sendFile(file: File) {
-            commander.sendFile(file)
+            commander.askPermissionToSendFile(file)
+    }
+
+    suspend fun sendFile(files: List<File>) {
+        commander.askPermissionToSendFiles(files)
     }
 
     suspend fun sendDir(dir : String ){
@@ -56,12 +61,16 @@ class BotaUser {
             Log.d("BTU_RV",commander.recv().toString())
     }
 
-    fun setCallback(callback: NetworkService.NetworkCallback) : BotaUser {
+    fun  setCallback(callback: NetworkService.NetworkCallback) : BotaUser {
         networkCallback = callback
 
         listener.setCallback(object : BotaClientCallback{
             override fun onFileIncomingRequest(filename: String, size: Long) {
                 networkCallback.onDataIncomingRequest(uname,ip,filename,size)
+            }
+
+            override fun onMultipleFileIncomingRequest(fileCount: Int, size: Long) {
+                networkCallback.onMultipleFilesIncomingRequest(uname, ip, fileCount, size)
             }
 
         })
@@ -70,5 +79,13 @@ class BotaUser {
 
     fun receiveFile(fileName : String, size : Long){
         listener.initFileReceiver(fileName, size)
+    }
+
+    fun receiveFile(fcount : Int, size : Long){
+        listener.initFileReceiver(fcount, size)
+    }
+
+    fun denyFile(ip : String){
+        listener.denyFile(ip)
     }
 }

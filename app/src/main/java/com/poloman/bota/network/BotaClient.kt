@@ -47,10 +47,6 @@ class BotaClient {
         bis = BufferedInputStream(socket.inputStream)
     }
 
-    fun setDisconnectCallback( onDisconnect : () -> Unit = {}){
-        this.onDisconnect = onDisconnect
-    }
-
     fun setCallback(permissionCallback: BotaUser.BotaClientCallback){
         callback = permissionCallback
     }
@@ -108,6 +104,12 @@ class BotaClient {
                         val size = sizeResult.result.substringAfter("FILE_SIZE ").toLong()
                         callback.onFileIncomingRequest(fileName,size)
                     }
+                    else if(result.result.startsWith("MULTIPLE_FILE_INCOMING_PERMISSION")){
+                        val fileCount = result.result.substringAfter("MULTIPLE_FILE_INCOMING_PERMISSION ").toInt()
+                        val sizeResult = recv() as Result.CommandResponse
+                        val size = sizeResult.result.substringAfter("FILE_SIZE ").toLong()
+                        callback.onMultipleFileIncomingRequest(fileCount,size)
+                    }
                 }
             }
             catch (e : Exception){
@@ -122,6 +124,11 @@ class BotaClient {
     @SuppressLint("NewApi")
     fun initFileReceiver(fileName :String, size : Long){
         sendCommand("OK $fileName")
+    }
+
+    @SuppressLint("NewApi")
+    fun initFileReceiver(fcount :Int, size : Long){
+        sendCommand("OK $size")
     }
 
 
@@ -141,7 +148,16 @@ class BotaClient {
             socket.close()
         }
         catch (e : IOException){
+            Log.d("BTU_BC_CLOSE",e.toString())
         }
+    }
+
+    fun askPermissionToSendFile(file: File){
+        transferStrategy.askPermissionToSendFile(file,bos,bis)
+    }
+
+    fun askPermissionToSendFiles(files : List<File>){
+        transferStrategy.askPermissionToSendFiles(files, bos, bis)
     }
 
     suspend fun sendFile(file : File){
@@ -160,4 +176,7 @@ class BotaClient {
         return socket.inetAddress.toString()
     }
 
+    fun denyFile(ip: String){
+        sendCommand("DENIED")
+    }
 }

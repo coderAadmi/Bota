@@ -26,6 +26,7 @@ fun PermissionDialog(modifier: Modifier,
                      networkResponseState : StateFlow<NetworkResponse>,
                      onAccept : (ip : String) -> Unit, onDeny: (ip : String) -> Unit,
                      onFileAccept : (ip : String, fname : String, size : Long) -> Unit,
+                     onMulFilesAccept : (ip : String, fCount : Int, size : Long) -> Unit,
                      onFileDeny : (ip : String) -> Unit
 ) {
     val response = networkResponseState.collectAsState()
@@ -75,6 +76,35 @@ fun PermissionDialog(modifier: Modifier,
 
         NetworkResponse.Nothing -> {
             // Optionally show a Snackbar or Dialog here
+        }
+
+        is NetworkResponse.IncomingMulDataRequest -> {
+            val request = response.value as NetworkResponse.IncomingMulDataRequest
+            var sizeInKB = (request.size.toFloat()) /1024
+            var sizeUnit = "KB"
+            var sizeInMB = 0f
+            var sizeShown = sizeInKB
+            if(sizeInKB > 1024){
+                sizeInMB = sizeInKB/1024
+                sizeUnit = "MB"
+                sizeShown = sizeInMB
+            }
+            var sizeInGB = 0f
+            if(sizeInMB > 1024){
+                sizeInGB = sizeInMB/1024
+                sizeUnit = "GB"
+                sizeShown = sizeInGB
+            }
+
+            Dialog(onDismissRequest = { onFileDeny(request.ip) }) {
+                AcceptConnectionCard(
+                    modifier = modifier,
+                    onAccept = { onMulFilesAccept(request.ip, request.fileCount, request.size) },
+                    onDeny = { onFileDeny(request.ip) },
+                    title = "Incoming Files",
+                    information = "Incoming ${request.fileCount} files from ${request.name} of size $sizeShown $sizeUnit"
+                )
+            }
         }
     }
 }

@@ -52,13 +52,32 @@ class MouseActivity : ComponentActivity(), SensorEventListener {
 
             networkService?.let { service ->
                 service.networkCallback = object : NetworkService.NetworkCallback{
-                    override fun onConnectionRequest(from: String, ip : String) {
-
+                    override fun onConnectionRequest(from: String, ip: String) {
+                        TODO("Not yet implemented")
                     }
 
-                    override fun onDataIncomingRequest() {
-                        isClientConnected = true
+                    override fun onDataIncomingRequest(
+                        from: String,
+                        ip: String,
+                        fileName: String,
+                        size: Long
+                    ) {
+                        TODO("Not yet implemented")
                     }
+
+                    override fun onMultipleFilesIncomingRequest(
+                        from: String,
+                        ip: String,
+                        fileCount: Int,
+                        size: Long
+                    ) {
+                        TODO("Not yet implemented")
+                    }
+
+                    override fun onServerStarted() {
+                        TODO("Not yet implemented")
+                    }
+
 
                 }
             }

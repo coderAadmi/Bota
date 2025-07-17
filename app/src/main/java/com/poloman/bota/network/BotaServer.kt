@@ -152,6 +152,7 @@ class BotaServer {
     fun denyConnection(ip: String) {
         try {
             clients.get(ip)?.closeConnection()
+            clients.remove(ip)
         } catch (e: Exception) {
 
         } finally {
@@ -161,6 +162,10 @@ class BotaServer {
 
     suspend fun sendFile(sendTo: String, file: File) {
         clients.get(sendTo)!!.sendFile(file)
+    }
+
+    suspend fun sendFile(sendTo: String, files: List<File>) {
+            clients.get(sendTo)!!.sendFile(files)
     }
 
     suspend fun sendDir(sendTo: String, dir: String) {
@@ -173,6 +178,16 @@ class BotaServer {
 
     suspend fun receiveFileFrom(ip: String, fname: String, size :Long) {
         clients.get(ip)!!.receiveFile(fname,size)
+    }
+
+    suspend fun receiveFileFrom(ip: String, fcount: Int, size: Long) {
+            clients.get(ip)!!.receiveFile(fcount, size)
+    }
+
+    fun denyFile(ip : String){
+        CoroutineScope(Dispatchers.IO).launch{
+            clients.get(ip)!!.denyFile(ip)
+        }
     }
 
 }
