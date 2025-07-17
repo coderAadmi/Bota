@@ -30,6 +30,8 @@ class BotaClient {
 
     private var isListening = true
 
+    lateinit var onDisconnect : () -> Unit
+
     @RequiresApi(Build.VERSION_CODES.R)
     constructor(host : String, port : Int){
         this.host = host
@@ -37,10 +39,9 @@ class BotaClient {
         connectToServer()
     }
 
-    constructor(socket: Socket){
+    constructor(socket: Socket, onDisconnect : () -> Unit = {}){
         this.socket = socket
         this.host = ""
-
         bos = BufferedOutputStream(socket.outputStream)
         bos.flush()
         bis = BufferedInputStream(socket.inputStream)
@@ -60,15 +61,17 @@ class BotaClient {
         }
         catch (e : UnknownHostException){
             Log.d("BTU_CLI_UEX",e.toString())
+            onDisconnect()
         }
         catch (e : IOException){
             Log.d("BTU_CLI_IOEX",e.toString())
+            onDisconnect()
         }
     }
 
 
     @RequiresApi(Build.VERSION_CODES.R)
-    fun startListening(){
+    fun startListening(onNameAsked : (serverName : String) -> Unit = {}){
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 while (isListening) {
@@ -90,7 +93,10 @@ class BotaClient {
                         sendCommand("DIR_CREATED $fileName")
                     }
                     else if(result.result.startsWith("UNAME")){
+                        val serverName = result.result.substringAfter("UNAME ")
+                        Log.d("BTU_SENDING_NAME", "To server $serverName")
                         sendCommand("UNAME Poloman-Android")
+                        onNameAsked(serverName)
                     }
                     else if(result.result.startsWith("FILE_INCOMING_PERMISSION")){
                         val fileName = result.result.substringAfter("FILE_INCOMING_PERMISSION ")
@@ -98,11 +104,18 @@ class BotaClient {
                         val size = sizeResult.result.substringAfter("FILE_SIZE ").toLong()
                         callback.onFileIncomingRequest(fileName,size)
                     }
+                    else if(result.result.startsWith("MULTIPLE_FILE_INCOMING_PERMISSION")){
+                        val fileCount = result.result.substringAfter("MULTIPLE_FILE_INCOMING_PERMISSION ").toInt()
+                        val sizeResult = recv() as Result.CommandResponse
+                        val size = sizeResult.result.substringAfter("FILE_SIZE ").toLong()
+                        callback.onMultipleFileIncomingRequest(fileCount,size)
+                    }
                 }
             }
             catch (e : Exception){
                 //socketException & IOException
                 Log.d("BTU_CLIENT","Disconnected ${e.toString()}")
+                onDisconnect()
             }
             //try catch
         }
@@ -111,6 +124,11 @@ class BotaClient {
     @SuppressLint("NewApi")
     fun initFileReceiver(fileName :String, size : Long){
         sendCommand("OK $fileName")
+    }
+
+    @SuppressLint("NewApi")
+    fun initFileReceiver(fcount :Int, size : Long){
+        sendCommand("OK $size")
     }
 
 
@@ -130,7 +148,16 @@ class BotaClient {
             socket.close()
         }
         catch (e : IOException){
+            Log.d("BTU_BC_CLOSE",e.toString())
         }
+    }
+
+    fun askPermissionToSendFile(file: File){
+        transferStrategy.askPermissionToSendFile(file,bos,bis)
+    }
+
+    fun askPermissionToSendFiles(files : List<File>){
+        transferStrategy.askPermissionToSendFiles(files, bos, bis)
     }
 
     suspend fun sendFile(file : File){
@@ -149,4 +176,7 @@ class BotaClient {
         return socket.inetAddress.toString()
     }
 
+    fun denyFile(ip: String){
+        sendCommand("DENIED")
+    }
 }

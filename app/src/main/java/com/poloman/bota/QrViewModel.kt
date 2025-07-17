@@ -28,22 +28,6 @@ class QrViewModel @Inject constructor(private val repository: BotaRepository) : 
         return repository.getFilesByType(fileType).cachedIn(viewModelScope)
     }
 
-    fun getFilesCountByType(fileType: Int) : StateFlow<Int> {
-        return repository.getFilesCountByType(viewModelScope,fileType)
-    }
-
-    fun getNetWorkActionState() : StateFlow<BotaRepository.NetworkAction>{
-        return repository.networkAction
-    }
-
-    fun startBotaServer(){
-        repository.startServer()
-    }
-
-    fun connectToClient(host : String){
-        repository.connectToClient(host)
-    }
-
     fun setNetworkServiceState(request: NetworkResponse) {
         repository.setNetworkServiceState(request)
     }

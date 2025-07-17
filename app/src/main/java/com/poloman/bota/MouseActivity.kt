@@ -1,6 +1,5 @@
 package com.poloman.bota
 
-import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -23,16 +22,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
 import androidx.compose.ui.Modifier
 import androidx.constraintlayout.compose.ConstraintLayout
-import com.poloman.bota.network.NetworkResponse
 import com.poloman.bota.network.NetworkService
 import com.poloman.bota.service.MonitorService
-import com.poloman.bota.service.OnFileDiscovered
 import com.poloman.bota.ui.theme.BotaTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.io.File
 import kotlin.math.abs
 
 @AndroidEntryPoint
@@ -55,14 +51,33 @@ class MouseActivity : ComponentActivity(), SensorEventListener {
             Log.d("BTU_BND", "Net Service bound")
 
             networkService?.let { service ->
-                service.permissionCallback = object : NetworkService.PermissionCallback{
-                    override fun onConnectionRequest(from: String, ip : String) {
-
+                service.networkCallback = object : NetworkService.NetworkCallback{
+                    override fun onConnectionRequest(from: String, ip: String) {
+                        TODO("Not yet implemented")
                     }
 
-                    override fun onDataIncomingRequest() {
-                        isClientConnected = true
+                    override fun onDataIncomingRequest(
+                        from: String,
+                        ip: String,
+                        fileName: String,
+                        size: Long
+                    ) {
+                        TODO("Not yet implemented")
                     }
+
+                    override fun onMultipleFilesIncomingRequest(
+                        from: String,
+                        ip: String,
+                        fileCount: Int,
+                        size: Long
+                    ) {
+                        TODO("Not yet implemented")
+                    }
+
+                    override fun onServerStarted() {
+                        TODO("Not yet implemented")
+                    }
+
 
                 }
             }

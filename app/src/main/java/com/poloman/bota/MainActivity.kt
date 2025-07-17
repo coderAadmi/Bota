@@ -11,7 +11,6 @@ import android.os.Environment
 import android.os.IBinder
 import android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -29,6 +28,7 @@ import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,9 +36,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.core.net.toFile
 import androidx.navigation.compose.rememberNavController
-import com.poloman.bota.network.BotaServer
+import com.poloman.bota.network.Communicator
 import com.poloman.bota.network.NetworkResponse
 import com.poloman.bota.network.NetworkService
 import com.poloman.bota.screen.AppNavHost
@@ -47,6 +46,7 @@ import com.poloman.bota.screen.PermissionDialog
 import com.poloman.bota.service.MonitorService
 import com.poloman.bota.service.OnFileDiscovered
 import com.poloman.bota.ui.theme.BotaTheme
+import com.poloman.bota.views.ConnectedUsersDialog
 import dagger.hilt.android.AndroidEntryPoint
 import java.io.File
 
@@ -110,15 +110,46 @@ class MainActivity : ComponentActivity() {
             Log.d("BTU_BND", "Net Service bound")
 
             networkService?.let { service ->
-                service.permissionCallback = object : NetworkService.PermissionCallback{
-                    override fun onConnectionRequest( from : String, ip : String){
-                        vm.setNetworkServiceState(NetworkResponse.ConnectionRequest(from,ip))
+                service.networkCallback = object : NetworkService.NetworkCallback {
+                    override fun onConnectionRequest(from: String, ip: String) {
+                        vm.setNetworkServiceState(NetworkResponse.ConnectionRequest(from, ip))
                     }
 
-                    override fun onDataIncomingRequest(from : String, ip : String, fName : String, size : Long) {
-                        vm.setNetworkServiceState(NetworkResponse.IncomingDataRequest(from,ip,fName, size))
+                    override fun onDataIncomingRequest(
+                        from: String,
+                        ip: String,
+                        fName: String,
+                        size: Long
+                    ) {
+                        vm.setNetworkServiceState(
+                            NetworkResponse.IncomingDataRequest(
+                                from,
+                                ip,
+                                fName,
+                                size
+                            )
+                        )
                     }
 
+                    override fun onMultipleFilesIncomingRequest(
+                        from: String,
+                        ip: String,
+                        fileCount: Int,
+                        size: Long
+                    ) {
+                        vm.setNetworkServiceState(
+                            NetworkResponse.IncomingMulDataRequest(
+                                from,
+                                ip,
+                                fileCount,
+                                size
+                            )
+                        )
+                    }
+
+                    override fun onServerStarted() {
+                        vm.generateQrCode()
+                    }
                 }
             }
 
@@ -145,7 +176,28 @@ class MainActivity : ComponentActivity() {
 
     }
 
-    val vm  by viewModels<QrViewModel>()
+    val connector = object : Communicator {
+        @RequiresApi(Build.VERSION_CODES.R)
+        override fun onStartServer() {
+            networkService?.let {
+                it.initServer()
+            }
+        }
+
+        override fun onConnectToServer(ip: String) {
+            networkService?.let {
+                it.connectToServer(ip)
+            }
+
+        }
+
+        override fun showConnectedDevices() {
+            vm.showUserSelector()
+        }
+
+    }
+
+    val vm by viewModels<QrViewModel>()
 
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -157,11 +209,15 @@ class MainActivity : ComponentActivity() {
                 val startDestination = Destination.HOME
                 var selectedDestination by remember { mutableStateOf(0) }
 
-                Scaffold(modifier = Modifier
-                    .fillMaxSize().background(Color.Gray),
+                Scaffold(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Gray),
                     bottomBar = {
-                        NavigationBar(windowInsets = NavigationBarDefaults.windowInsets,
-                            containerColor = Color(0xFFF7FAFC)) {
+                        NavigationBar(
+                            windowInsets = NavigationBarDefaults.windowInsets,
+                            containerColor = Color(0xFFF7FAFC)
+                        ) {
                             Destination.entries.forEachIndexed { index, destination ->
                                 NavigationBarItem(
                                     selected = selectedDestination == index,
@@ -184,76 +240,62 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
 
 
-                    when(vm.getNetWorkActionState().collectAsState().value){
-                        is BotaRepository.NetworkAction.CONNECT_TO_CLIENT -> {
-                            host: String ->
-                            networkService?.let { it.connectToServer(host) }
-
-                        }
-                        BotaRepository.NetworkAction.NOT_STARTED -> {
-
-                        }
-                        BotaRepository.NetworkAction.START_SERVER -> {
-                            networkService?.let {
-                                it.initServer()
-                            }
-                        }
-
-                        BotaRepository.NetworkAction.STARTED -> {
-
-                        }
-                    }
-
-                    networkService?.let {
-                        when(it.getServerState().collectAsState().value){
-                            is BotaServer.ServerState.Error -> {
-
-                            }
-                            BotaServer.ServerState.Running -> {
-                                vm.generateQrCode()
-                            }
-                            BotaServer.ServerState.Stopped -> {
-
-                            }
-                        }
-                    }
-
                     Column(modifier = Modifier.padding(innerPadding)) {
-                        when(vm.userSelectorState.collectAsState().value){
+                        when (vm.userSelectorState.collectAsState().value) {
                             true -> {
                                 networkService?.let {
-                                    it.getConnectedUsers().forEach { user ->
-                                        Log.d("BOTA_USER_LIST", "${user.uname} : ${user.ip}")
-                                            networkService?.sendFiles(user.ip,vm.getSelectedFiles().value)
+                                    ConnectedUsersDialog(it.getConnectedUsers(), onDismiss = {
+                                        vm.hideUserSelector()
+                                    })
+                                    { selectedUsers ->
+                                        selectedUsers.forEach { user ->
+                                            Log.d("BOTA_USER_LIST", "${user.uname} : ${user.ip}")
+                                                networkService?.sendFiles(
+                                                    user.ip,
+                                                    vm.getSelectedFiles().value
+                                                )
+                                        }
                                     }
                                 }
-                                vm.hideUserSelector()
                             }
-                            false -> {
 
+                            false -> {
                             }
                         }
-                        PermissionDialog(modifier = Modifier, vm.getNetworkResponseState(), onAccept = { ip : String ->
-                            networkService?.acceptConnection(ip)
-                            vm.setNetworkServiceState(NetworkResponse.Nothing)
-                        },
-                            onDeny = { ip :String ->
+                        PermissionDialog(
+                            modifier = Modifier,
+                            vm.getNetworkResponseState(),
+                            onAccept = { ip: String ->
+                                networkService?.acceptConnection(ip)
+                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                            },
+                            onDeny = { ip: String ->
                                 networkService?.denyConnection(ip)
                                 vm.setNetworkServiceState(NetworkResponse.Nothing)
                             },
 
-                            onFileAccept = { ip  : String, fname : String, size : Long ->
+                            onFileAccept = { ip: String, fname: String, size: Long ->
                                 networkService?.acceptFile(ip, fileName = fname, size = size)
                                 vm.setNetworkServiceState(NetworkResponse.Nothing)
                             },
 
-                            onFileDeny = { ip : String ->
+                            onMulFilesAccept = { ip: String, fcount: Int, size: Long ->
+                                networkService?.acceptFile(ip, fcount, size)
+                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                            },
+
+                            onFileDeny = { ip: String ->
                                 networkService?.denyFile(ip)
                                 vm.setNetworkServiceState(NetworkResponse.Nothing)
                             }
 
-                            )
-                        AppNavHost(navController,startDestination, Modifier.padding(innerPadding))
+                        )
+                        AppNavHost(
+                            navController,
+                            startDestination,
+                            Modifier.padding(innerPadding),
+                            communicator = connector
+                        )
                     }
                 }
             }
@@ -299,16 +341,15 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         try {
-            if(netConnection!= null){
+            if (netConnection != null) {
                 unbindService(netConnection)
             }
-            if(connection!= null){
+            if (connection != null) {
                 unbindService(connection)
             }
 
-            monitorService?.let{it.stopSelf()}
-        }
-        catch (e : Exception){
+            monitorService?.let { it.stopSelf() }
+        } catch (e: Exception) {
 
         }
     }

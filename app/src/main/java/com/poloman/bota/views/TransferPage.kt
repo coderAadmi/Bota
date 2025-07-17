@@ -32,14 +32,14 @@ import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavController
 import com.poloman.bota.QrViewModel
 import com.poloman.bota.R
+import com.poloman.bota.network.Communicator
 import kotlinx.coroutines.flow.StateFlow
 import java.io.File
 
 @Composable
-fun TransferPage(navController: NavController) {
+fun TransferPage(communicator: Communicator) {
 
     val qrVm = hiltViewModel<QrViewModel>()
     val filePickerLauncher = rememberLauncherForActivityResult(object :
@@ -139,7 +139,7 @@ fun TransferPage(navController: NavController) {
 
         Button(
             onClick = {
-                qrVm.showUserSelector()
+                communicator.showConnectedDevices()
             },
             modifier = Modifier
                 .fillMaxWidth()
