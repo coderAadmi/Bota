@@ -4,6 +4,7 @@ import android.os.Build
 import android.os.Environment
 import android.util.Log
 import androidx.annotation.RequiresApi
+import com.poloman.bota.BotaUser
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
@@ -14,8 +15,23 @@ import java.nio.ByteBuffer
 
 class BotaTransferStrategy : SendStrategy {
 
+    private var incomingFileSize = 0L
+    private var outGoingFileSize = 0L
+    private var totalSentSize = 0L
+    private var totalReadSize = 0L
+    private lateinit var clientCallback: BotaUser.BotaClientCallback
+
     @RequiresApi(Build.VERSION_CODES.R)
     val root = "${Environment.getExternalStorageDirectory().path}${File.separator}BotaStorage${File.separator}"
+
+    fun setFileIncomingSize(incomSize : Long){
+        incomingFileSize = incomSize
+        totalReadSize = 0L
+    }
+
+    fun setCallback(callback : BotaUser.BotaClientCallback){
+        clientCallback = callback
+    }
 
     override fun sendFile(
         file: File,
@@ -43,7 +59,9 @@ class BotaTransferStrategy : SendStrategy {
                 while (readBytes > 0){
                     bos.write(byteArray,0,readBytes)
                     bytesSent += readBytes
-                    Log.d("BTU_BYTES_SENT","Bytes Sent $readBytes  Total : $bytesSent" )
+//                    Log.d("BTU_BYTES_SENT","Bytes Sent $readBytes  Total : $bytesSent" )
+                    totalSentSize += readBytes
+                    clientCallback.onOutgoingProgressChange((100*(totalSentSize.toFloat() / outGoingFileSize)).toInt())
                     readBytes = fis.read(byteArray,0,ftSize)
                 }
                 bos.flush()
@@ -110,7 +128,9 @@ class BotaTransferStrategy : SendStrategy {
                     break
                 fos.write(byteArray, 0, readBytes)
                 totalBytesRead += readBytes
-                Log.d("BTU_RCV_FILE","readBytes $readBytes  Total : $totalBytesRead")
+//                Log.d("BTU_RCV_FILE","readBytes $readBytes  Total : $totalBytesRead")
+                totalReadSize += readBytes
+                clientCallback.onIncomingProgressChange( (100 * (totalReadSize.toFloat() / incomingFileSize)).toInt() )
             }
             fos.flush()
             fos.close()
@@ -179,6 +199,8 @@ class BotaTransferStrategy : SendStrategy {
         val reply = recvCommand(bos,bis) as Result.CommandResponse
 
         if(reply.result.equals("OK $totalFilesSize")){
+            outGoingFileSize = totalFilesSize
+            totalSentSize = 0L
             files.forEach {
                 sendFile(it, bos, bis)
             }

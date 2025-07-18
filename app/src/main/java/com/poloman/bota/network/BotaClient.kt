@@ -47,8 +47,9 @@ class BotaClient {
         bis = BufferedInputStream(socket.inputStream)
     }
 
-    fun setCallback(permissionCallback: BotaUser.BotaClientCallback){
-        callback = permissionCallback
+    fun setCallback(clientCallBack: BotaUser.BotaClientCallback){
+        callback = clientCallBack
+        transferStrategy.setCallback(callback)
     }
 
 
@@ -128,6 +129,7 @@ class BotaClient {
 
     @SuppressLint("NewApi")
     fun initFileReceiver(fcount :Int, size : Long){
+        transferStrategy.setFileIncomingSize(size)
         sendCommand("OK $size")
     }
 

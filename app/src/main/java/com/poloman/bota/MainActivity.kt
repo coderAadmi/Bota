@@ -47,8 +47,11 @@ import com.poloman.bota.service.MonitorService
 import com.poloman.bota.service.OnFileDiscovered
 import com.poloman.bota.ui.theme.BotaTheme
 import com.poloman.bota.views.ConnectedUsersDialog
+import com.poloman.bota.views.ProgressCard
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.update
 import java.io.File
+import kotlin.collections.plus
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -149,6 +152,16 @@ class MainActivity : ComponentActivity() {
 
                     override fun onServerStarted() {
                         vm.generateQrCode()
+                    }
+
+                    override fun onIncomingProgressChange(ip: String, progress: Int) {
+                        Log.d("BOTA_IN_PROGRESS","From $ip progress $progress %")
+                        vm.setProgressState(ip, progress)
+                    }
+
+                    override fun onOutgoingProgressChange(ip: String, progress: Int) {
+                        Log.d("BOTA_OUT_PROGRESS","To $ip progress $progress %")
+                        vm.setProgressState(ip, progress)
                     }
                 }
             }
@@ -255,6 +268,7 @@ class MainActivity : ComponentActivity() {
                                                     vm.getSelectedFiles().value
                                                 )
                                         }
+                                        vm.hideUserSelector()
                                     }
                                 }
                             }
@@ -290,6 +304,10 @@ class MainActivity : ComponentActivity() {
                             }
 
                         )
+
+                        ProgressCard(modifier = Modifier,
+                            vm.getProgressState())
+
                         AppNavHost(
                             navController,
                             startDestination,

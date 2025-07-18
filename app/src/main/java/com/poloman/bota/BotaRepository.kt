@@ -15,13 +15,11 @@ import com.github.alexzhirkevich.customqrgenerator.vector.style.QrVectorLogoPadd
 import com.github.alexzhirkevich.customqrgenerator.vector.style.QrVectorLogoShape
 import com.poloman.bota.network.Helper
 import com.poloman.bota.network.NetworkResponse
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 
 class BotaRepository @Inject constructor(private val appContext : Context,
@@ -96,5 +94,17 @@ class BotaRepository @Inject constructor(private val appContext : Context,
         _userSelectorState.value = false
     }
 
+    private val _progressState = MutableStateFlow<Map<String,Int>>(emptyMap())
+    val progressState = _progressState.asStateFlow()
+
+    fun setProgressMapState(ip : String, progress: Int){
+        _progressState.update { oldMap ->
+            oldMap + (ip to progress)
+        }
+    }
+
+    fun getProgressMapState(): StateFlow<Map<String, Int>> {
+        return progressState
+    }
 
 }

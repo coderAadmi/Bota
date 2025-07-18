@@ -14,10 +14,31 @@ class BotaUser {
     lateinit var ip: String
     lateinit var networkCallback: NetworkService.NetworkCallback
 
+    val clientCallback = object : BotaClientCallback{
+        override fun onFileIncomingRequest(filename: String, size: Long) {
+            networkCallback.onDataIncomingRequest(uname,ip,filename,size)
+        }
+
+        override fun onMultipleFileIncomingRequest(fileCount: Int, size: Long) {
+            networkCallback.onMultipleFilesIncomingRequest(uname, ip, fileCount, size)
+        }
+
+        override fun onIncomingProgressChange(progress: Int) {
+            networkCallback.onIncomingProgressChange(ip, progress)
+        }
+
+        override fun onOutgoingProgressChange(progress: Int) {
+            networkCallback.onOutgoingProgressChange(ip, progress)
+        }
+
+    }
+
 
     interface BotaClientCallback{
         fun onFileIncomingRequest(filename : String, size : Long)
         fun onMultipleFileIncomingRequest(fileCount : Int, size: Long)
+        fun onIncomingProgressChange(progress : Int)
+        fun onOutgoingProgressChange(progress : Int)
     }
 
     constructor(uname : String, ip : String, commander : BotaClient, listener : BotaClient, onDisconnected : (ip : String) -> Unit){
@@ -64,16 +85,8 @@ class BotaUser {
     fun  setCallback(callback: NetworkService.NetworkCallback) : BotaUser {
         networkCallback = callback
 
-        listener.setCallback(object : BotaClientCallback{
-            override fun onFileIncomingRequest(filename: String, size: Long) {
-                networkCallback.onDataIncomingRequest(uname,ip,filename,size)
-            }
-
-            override fun onMultipleFileIncomingRequest(fileCount: Int, size: Long) {
-                networkCallback.onMultipleFilesIncomingRequest(uname, ip, fileCount, size)
-            }
-
-        })
+        listener.setCallback(clientCallback)
+        commander.setCallback(clientCallback)
         return this
     }
 

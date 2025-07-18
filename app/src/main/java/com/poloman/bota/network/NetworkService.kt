@@ -35,6 +35,8 @@ class NetworkService : Service() {
         fun onDataIncomingRequest(from : String, ip : String, fileName : String, size : Long)
         fun onMultipleFilesIncomingRequest(from: String, ip: String, fileCount: Int, size: Long)
         fun onServerStarted()
+        fun onIncomingProgressChange(ip : String, progress : Int)
+        fun onOutgoingProgressChange(ip : String, progress : Int)
     }
 
      var networkCallback: NetworkCallback? = null

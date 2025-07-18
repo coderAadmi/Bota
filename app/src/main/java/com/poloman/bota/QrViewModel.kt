@@ -2,7 +2,6 @@ package com.poloman.bota
 
 import android.graphics.drawable.Drawable
 import android.net.Uri
-import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
@@ -53,4 +52,12 @@ class QrViewModel @Inject constructor(private val repository: BotaRepository) : 
     }
 
     val userSelectorState = repository.userSelectorState
+
+    fun setProgressState(ip : String, progress: Int){
+        repository.setProgressMapState(ip, progress)
+    }
+
+    fun getProgressState(): StateFlow<Map<String, Int>> {
+        return repository.getProgressMapState()
+    }
 }
