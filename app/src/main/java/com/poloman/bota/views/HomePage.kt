@@ -70,25 +70,16 @@ fun HomePage(communicator: Communicator) {
             .padding(bottom = 1.dp)
             .background(Color(0xFFF7FAFC))
     ) {
-        val (title, strategy, genQR, scanQR, qrImg, permissionCard) = createRefs()
+        val ( strategy, genQR, scanQR, qrImg) = createRefs()
         val context = LocalContext.current
 
-
-        Text(
-            "Bota",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            modifier = Modifier.constrainAs(title) {
-                top.linkTo(parent.top, margin = 24.dp)
-                centerHorizontallyTo(parent)
-            })
 
         Text(
             "Choose how you want to connect to other devices on your local network",
             modifier = Modifier
                 .padding(horizontal = 20.dp)
                 .constrainAs(strategy) {
-                    top.linkTo(title.bottom, margin = 12.dp)
+                    top.linkTo(parent.top, margin = 12.dp)
                     centerHorizontallyTo(parent)
                 })
 

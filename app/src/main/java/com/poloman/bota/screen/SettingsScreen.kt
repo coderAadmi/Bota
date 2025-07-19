@@ -25,15 +25,6 @@ import com.poloman.bota.views.SettingsPage
 @Composable
 fun SettingsScreen(){
     Column(modifier = Modifier.fillMaxSize().padding(bottom = 1.dp)){
-        CenterAlignedTopAppBar(title = {Text(text = "More", fontWeight = FontWeight.Bold)},
-            windowInsets = WindowInsets(0.dp),
-            actions = {
-                IconButton(onClick = {}) {
-                    Icon(imageVector = Icons.Filled.AccountCircle,
-                        contentDescription = "Go back")
-                }
-            }
-        )
         SettingsPage()
     }
 }

@@ -102,7 +102,7 @@ fun TransferPage(communicator: Communicator) {
                 .padding( horizontal = 12.dp)
                 .constrainAs(selectFilesBtn) {
                     centerHorizontallyTo(parent)
-                    top.linkTo(parent.top, margin = 12.dp)
+                    top.linkTo(parent.top, margin = 4.dp)
                 }){
             ConstraintLayout(Modifier.fillMaxWidth()) {
                 val (ic, tt) = createRefs()

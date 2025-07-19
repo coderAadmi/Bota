@@ -107,4 +107,19 @@ class BotaRepository @Inject constructor(private val appContext : Context,
         return progressState
     }
 
+    private val _progressDialogShown = MutableStateFlow<Boolean>(false)
+    val progressDialogShown = _progressDialogShown.asStateFlow()
+
+    fun showProgressDialog(){
+        _progressDialogShown.value = true
+    }
+
+    fun hideProgressDialog(){
+        _progressDialogShown.value = false
+    }
+
+    fun getProgressDialogState(): StateFlow<Boolean> {
+        return progressDialogShown
+    }
+
 }

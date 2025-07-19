@@ -60,4 +60,16 @@ class QrViewModel @Inject constructor(private val repository: BotaRepository) : 
     fun getProgressState(): StateFlow<Map<String, Int>> {
         return repository.getProgressMapState()
     }
+
+    fun showProgressDialog(){
+        repository.showProgressDialog()
+    }
+
+    fun hideProgressDialog(){
+        repository.hideProgressDialog()
+    }
+
+    fun getProgressDialogState(): StateFlow<Boolean> {
+        return repository.getProgressDialogState()
+    }
 }

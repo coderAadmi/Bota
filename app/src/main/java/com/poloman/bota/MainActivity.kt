@@ -28,7 +28,6 @@ import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,12 +45,11 @@ import com.poloman.bota.screen.PermissionDialog
 import com.poloman.bota.service.MonitorService
 import com.poloman.bota.service.OnFileDiscovered
 import com.poloman.bota.ui.theme.BotaTheme
+import com.poloman.bota.views.BotaAppBar
 import com.poloman.bota.views.ConnectedUsersDialog
-import com.poloman.bota.views.ProgressCard
+import com.poloman.bota.views.ProgressDialog
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.update
 import java.io.File
-import kotlin.collections.plus
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -252,8 +250,8 @@ class MainActivity : ComponentActivity() {
                     }
                 ) { innerPadding ->
 
-
-                    Column(modifier = Modifier.padding(innerPadding)) {
+                    Column(modifier = Modifier.padding(innerPadding))
+                    {
                         when (vm.userSelectorState.collectAsState().value) {
                             true -> {
                                 networkService?.let {
@@ -305,8 +303,14 @@ class MainActivity : ComponentActivity() {
 
                         )
 
-                        ProgressCard(modifier = Modifier,
-                            vm.getProgressState())
+                        ProgressDialog(vm.getProgressDialogState(),vm.getProgressState()){
+                            vm.hideProgressDialog()
+                        }
+
+                        BotaAppBar(selectedDestination, vm.getProgressState(), vm.getProgressDialogState()){
+                            vm.showProgressDialog()
+                        }
+
 
                         AppNavHost(
                             navController,
