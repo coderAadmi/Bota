@@ -30,16 +30,17 @@ import kotlin.collections.mutableListOf
 @SuppressLint("NewApi")
 class NetworkService : Service() {
 
-    interface NetworkCallback{
-        fun onConnectionRequest(from : String, ip : String)
-        fun onDataIncomingRequest(from : String, ip : String, fileName : String, size : Long)
+    interface NetworkCallback {
+        fun onConnectionRequest(from: String, ip: String)
+        fun onDataIncomingRequest(from: String, ip: String, fileName: String, size: Long)
         fun onMultipleFilesIncomingRequest(from: String, ip: String, fileCount: Int, size: Long)
         fun onServerStarted()
-        fun onIncomingProgressChange(ip : String, progress : Int)
-        fun onOutgoingProgressChange(ip : String, progress : Int)
+        fun onIncomingProgressChange(ip: String, progress: TransferProgress)
+        fun onOutgoingProgressChange(ip: String, progress: TransferProgress)
+        fun onStatusChange(ip: String, progress: TransferProgress)
     }
 
-     var networkCallback: NetworkCallback? = null
+    var networkCallback: NetworkCallback? = null
 
     inner class NetworkServiceBinder : Binder() {
         fun getService(): NetworkService = this@NetworkService
@@ -69,41 +70,40 @@ class NetworkService : Service() {
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
-     fun initServer() {
+    fun initServer() {
         CoroutineScope(Dispatchers.IO).launch {
             botaServer.initServer()
         }
     }
 
-    fun acceptConnection(ip : String){
+    fun acceptConnection(ip: String) {
         botaServer.startListeningFromClient(ip)
     }
 
-    fun denyConnection(ip : String){
+    fun denyConnection(ip: String) {
         botaServer.denyConnection(ip)
     }
 
-    fun getServerState() : StateFlow<BotaServer.ServerState> {
+    fun getServerState(): StateFlow<BotaServer.ServerState> {
         return botaServer.serverState
     }
 
-     fun sendFile(sendTo : String, uri: Uri ){
+    fun sendFile(sendTo: String, uri: Uri) {
         CoroutineScope(Dispatchers.IO).launch {
-            val file = GetFile.getFile(this@NetworkService,uri)
+            val file = GetFile.getFile(this@NetworkService, uri)
             botaServer.sendFile(sendTo, file)
             file.delete()
         }
     }
 
-    fun sendFiles(sendTo: String, uris : List<Uri>){
+    fun sendFiles(sendTo: String, uris: List<Uri>) {
         CoroutineScope(Dispatchers.IO).launch {
             val files = mutableListOf<File>()
-            uris.forEach {
-                uri ->
-                val file = GetFile.getFile(this@NetworkService,uri)
+            uris.forEach { uri ->
+                val file = GetFile.getFile(this@NetworkService, uri)
                 files.add(file)
             }
-            botaServer.sendFile(sendTo,files)
+            botaServer.sendFile(sendTo, files)
             files.forEach {
                 it.delete()
             }
@@ -112,9 +112,9 @@ class NetworkService : Service() {
     }
 
 
-    fun sendDir(sendTo : String, dirName : String){
+    fun sendDir(sendTo: String, dirName: String) {
         CoroutineScope(Dispatchers.IO).launch {
-            botaServer.sendDir(sendTo,dirName)
+            botaServer.sendDir(sendTo, dirName)
         }
     }
 
@@ -159,7 +159,7 @@ class NetworkService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         botaServer.stopServer()
-        Log.d("BTU_S","Destroyed")
+        Log.d("BTU_S", "Destroyed")
     }
 
     fun connectToServer(hostServer: String) {
@@ -172,20 +172,20 @@ class NetworkService : Service() {
 
     }
 
-    fun acceptFile(ip: String, fileName : String, size : Long) {
-        CoroutineScope(Dispatchers.IO).launch{
+    fun acceptFile(ip: String, fileName: String, size: Long) {
+        CoroutineScope(Dispatchers.IO).launch {
             botaServer.receiveFileFrom(ip, fileName, size)
         }
     }
 
-    fun acceptFile(ip: String, fileCount : Int, size : Long) {
-        CoroutineScope(Dispatchers.IO).launch{
+    fun acceptFile(ip: String, fileCount: Int, size: Long) {
+        CoroutineScope(Dispatchers.IO).launch {
             botaServer.receiveFileFrom(ip, fileCount, size)
         }
     }
 
     fun denyFile(ip: String) {
-        CoroutineScope(Dispatchers.IO).launch{
+        CoroutineScope(Dispatchers.IO).launch {
             botaServer.denyFile(ip)
         }
     }

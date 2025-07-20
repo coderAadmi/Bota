@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.ui.Modifier
 import androidx.constraintlayout.compose.ConstraintLayout
 import com.poloman.bota.network.NetworkService
+import com.poloman.bota.network.TransferProgress
 import com.poloman.bota.service.MonitorService
 import com.poloman.bota.ui.theme.BotaTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -75,6 +76,27 @@ class MouseActivity : ComponentActivity(), SensorEventListener {
                     }
 
                     override fun onServerStarted() {
+                        TODO("Not yet implemented")
+                    }
+
+                    override fun onIncomingProgressChange(
+                        ip: String,
+                        progress: TransferProgress
+                    ) {
+                        TODO("Not yet implemented")
+                    }
+
+                    override fun onOutgoingProgressChange(
+                        ip: String,
+                        progress: TransferProgress
+                    ) {
+                        TODO("Not yet implemented")
+                    }
+
+                    override fun onStatusChange(
+                        ip: String,
+                        progress: TransferProgress
+                    ) {
                         TODO("Not yet implemented")
                     }
 

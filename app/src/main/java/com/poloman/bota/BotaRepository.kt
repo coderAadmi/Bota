@@ -15,6 +15,7 @@ import com.github.alexzhirkevich.customqrgenerator.vector.style.QrVectorLogoPadd
 import com.github.alexzhirkevich.customqrgenerator.vector.style.QrVectorLogoShape
 import com.poloman.bota.network.Helper
 import com.poloman.bota.network.NetworkResponse
+import com.poloman.bota.network.TransferProgress
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -84,7 +85,7 @@ class BotaRepository @Inject constructor(private val appContext : Context,
         return selectedFilesFlow
     }
 
-    private val _userSelectorState = MutableStateFlow<Boolean>(false)
+    private val _userSelectorState = MutableStateFlow<Boolean>(true)
     val userSelectorState = _userSelectorState.asStateFlow()
     fun showUserSelector() {
         _userSelectorState.value = true
@@ -94,16 +95,16 @@ class BotaRepository @Inject constructor(private val appContext : Context,
         _userSelectorState.value = false
     }
 
-    private val _progressState = MutableStateFlow<Map<String,Int>>(emptyMap())
+    private val _progressState = MutableStateFlow<Map<String, TransferProgress>>(emptyMap())
     val progressState = _progressState.asStateFlow()
 
-    fun setProgressMapState(ip : String, progress: Int){
+    fun setProgressMapState(ip : String, progress: TransferProgress){
         _progressState.update { oldMap ->
             oldMap + (ip to progress)
         }
     }
 
-    fun getProgressMapState(): StateFlow<Map<String, Int>> {
+    fun getProgressMapState(): StateFlow<Map<String, TransferProgress>> {
         return progressState
     }
 

@@ -186,7 +186,7 @@ class BotaServer {
 
     fun denyFile(ip : String){
         CoroutineScope(Dispatchers.IO).launch{
-            clients.get(ip)!!.denyFile(ip)
+            clients.get(ip)!!.denyFile()
         }
     }
 

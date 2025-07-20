@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.poloman.bota.network.NetworkResponse
+import com.poloman.bota.network.TransferProgress
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,11 +54,11 @@ class QrViewModel @Inject constructor(private val repository: BotaRepository) : 
 
     val userSelectorState = repository.userSelectorState
 
-    fun setProgressState(ip : String, progress: Int){
+    fun setProgressState(ip : String, progress: TransferProgress){
         repository.setProgressMapState(ip, progress)
     }
 
-    fun getProgressState(): StateFlow<Map<String, Int>> {
+    fun getProgressState(): StateFlow<Map<String, TransferProgress>> {
         return repository.getProgressMapState()
     }
 

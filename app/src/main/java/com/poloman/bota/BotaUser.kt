@@ -4,7 +4,9 @@ import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
 import com.poloman.bota.network.BotaClient
+import com.poloman.bota.network.BotaClientCallback
 import com.poloman.bota.network.NetworkService
+import com.poloman.bota.network.TransferProgress
 import java.io.File
 
 class BotaUser {
@@ -24,22 +26,43 @@ class BotaUser {
         }
 
         override fun onIncomingProgressChange(progress: Int) {
-            networkCallback.onIncomingProgressChange(ip, progress)
+            networkCallback.onIncomingProgressChange(ip, TransferProgress.Transmitted(uname,progress))
         }
 
         override fun onOutgoingProgressChange(progress: Int) {
-            networkCallback.onOutgoingProgressChange(ip, progress)
+            networkCallback.onOutgoingProgressChange(ip, TransferProgress.Transmitted(uname,progress))
+        }
+
+        override fun onStartedCalculatingSize() {
+            networkCallback.onStatusChange(ip, TransferProgress.CalculatingSize(uname))
+        }
+
+        override fun onWaitingForPermissionToSend() {
+            networkCallback.onStatusChange(ip, TransferProgress.WaitingForPermissionToSend(uname))
+        }
+
+        override fun onAcceptRequest() { // self accepts incoming request
+            networkCallback.onStatusChange(ip, TransferProgress.WaitingForSender(uname))
+        }
+
+        override fun onRequestAccepted() { //client accepted the request
+            networkCallback.onStatusChange(ip, TransferProgress.CalculatingSize(uname))
+        }
+
+        override fun onRequestDenied() {
+            networkCallback.onStatusChange(ip, TransferProgress.RequestDenied(uname))
+        }
+
+        override fun onAllFilesSent() {
+            networkCallback.onStatusChange(ip, TransferProgress.Success(uname, false))
+        }
+
+        override fun onAllFilesReceived() {
+            networkCallback.onStatusChange(ip, TransferProgress.Success(uname, true))
         }
 
     }
 
-
-    interface BotaClientCallback{
-        fun onFileIncomingRequest(filename : String, size : Long)
-        fun onMultipleFileIncomingRequest(fileCount : Int, size: Long)
-        fun onIncomingProgressChange(progress : Int)
-        fun onOutgoingProgressChange(progress : Int)
-    }
 
     constructor(uname : String, ip : String, commander : BotaClient, listener : BotaClient, onDisconnected : (ip : String) -> Unit){
         this.commander = commander
@@ -96,9 +119,10 @@ class BotaUser {
 
     fun receiveFile(fcount : Int, size : Long){
         listener.initFileReceiver(fcount, size)
+        clientCallback.onAcceptRequest()
     }
 
-    fun denyFile(ip : String){
-        listener.denyFile(ip)
+    fun denyFile(){
+        listener.denyFile()
     }
 }

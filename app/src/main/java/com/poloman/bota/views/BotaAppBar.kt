@@ -17,13 +17,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.poloman.bota.R
+import com.poloman.bota.network.TransferProgress
 import kotlinx.coroutines.flow.StateFlow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BotaAppBar(
     destination: Int,
-    progressState: StateFlow<Map<String, Int>>,
+    progressState: StateFlow<Map<String, TransferProgress>>,
     progressDialogState: StateFlow<Boolean>,
     showDialog : ()-> Unit
 ) {

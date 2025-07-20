@@ -19,7 +19,7 @@ class BotaTransferStrategy : SendStrategy {
     private var outGoingFileSize = 0L
     private var totalSentSize = 0L
     private var totalReadSize = 0L
-    private lateinit var clientCallback: BotaUser.BotaClientCallback
+    private lateinit var clientCallback: BotaClientCallback
 
     @RequiresApi(Build.VERSION_CODES.R)
     val root = "${Environment.getExternalStorageDirectory().path}${File.separator}BotaStorage${File.separator}"
@@ -29,7 +29,7 @@ class BotaTransferStrategy : SendStrategy {
         totalReadSize = 0L
     }
 
-    fun setCallback(callback : BotaUser.BotaClientCallback){
+    fun setCallback(callback : BotaClientCallback){
         clientCallback = callback
     }
 
@@ -190,15 +190,18 @@ class BotaTransferStrategy : SendStrategy {
     }
 
     fun askPermissionToSendFiles(files : List<File>, bos : BufferedOutputStream, bis : BufferedInputStream) {
+        clientCallback.onStartedCalculatingSize()
         var totalFilesSize = 0L
         files.forEach {
             totalFilesSize += it.length()
         }
         sendCommand("MULTIPLE_FILE_INCOMING_PERMISSION ${files.size}", bos ,bis)
         sendCommand("FILE_SIZE ${totalFilesSize}",bos, bis)
+        clientCallback.onWaitingForPermissionToSend()
         val reply = recvCommand(bos,bis) as Result.CommandResponse
 
         if(reply.result.equals("OK $totalFilesSize")){
+            clientCallback.onRequestAccepted()
             outGoingFileSize = totalFilesSize
             totalSentSize = 0L
             files.forEach {
@@ -207,6 +210,7 @@ class BotaTransferStrategy : SendStrategy {
         }
         else{
             //denied
+            clientCallback.onRequestDenied()
         }
     }
 }

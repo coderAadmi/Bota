@@ -26,7 +26,7 @@ class BotaClient {
 
     val transferStrategy = BotaTransferStrategy()
 
-    private lateinit var callback: BotaUser.BotaClientCallback
+    private lateinit var callback: BotaClientCallback
 
     private var isListening = true
 
@@ -47,7 +47,7 @@ class BotaClient {
         bis = BufferedInputStream(socket.inputStream)
     }
 
-    fun setCallback(clientCallBack: BotaUser.BotaClientCallback){
+    fun setCallback(clientCallBack: BotaClientCallback){
         callback = clientCallBack
         transferStrategy.setCallback(callback)
     }
@@ -178,7 +178,7 @@ class BotaClient {
         return socket.inetAddress.toString()
     }
 
-    fun denyFile(ip: String){
+    fun denyFile(){
         sendCommand("DENIED")
     }
 }

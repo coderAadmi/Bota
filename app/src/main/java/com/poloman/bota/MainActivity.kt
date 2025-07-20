@@ -39,6 +39,7 @@ import androidx.navigation.compose.rememberNavController
 import com.poloman.bota.network.Communicator
 import com.poloman.bota.network.NetworkResponse
 import com.poloman.bota.network.NetworkService
+import com.poloman.bota.network.TransferProgress
 import com.poloman.bota.screen.AppNavHost
 import com.poloman.bota.screen.Destination
 import com.poloman.bota.screen.PermissionDialog
@@ -152,31 +153,61 @@ class MainActivity : ComponentActivity() {
                         vm.generateQrCode()
                     }
 
-                    override fun onIncomingProgressChange(ip: String, progress: Int) {
+                    override fun onIncomingProgressChange(ip: String, progress: TransferProgress) {
                         Log.d("BOTA_IN_PROGRESS","From $ip progress $progress %")
-                        vm.setProgressState(ip, progress)
+                        vm.setProgressState("FROM $ip", progress)
                     }
 
-                    override fun onOutgoingProgressChange(ip: String, progress: Int) {
+                    override fun onOutgoingProgressChange(ip: String, progress: TransferProgress) {
                         Log.d("BOTA_OUT_PROGRESS","To $ip progress $progress %")
-                        vm.setProgressState(ip, progress)
+                        vm.setProgressState("TO $ip", progress)
+                    }
+
+                    override fun onStatusChange(
+                        ip: String,
+                        progress: TransferProgress
+                    ) {
+                        when(progress){
+                            is TransferProgress.CalculatingSize -> {
+                                vm.showProgressDialog()
+                                vm.setProgressState("TO $ip", progress)
+                            }
+                            is TransferProgress.RequestDenied -> {
+                                vm.setProgressState("TO $ip", progress)
+                            }
+                            is TransferProgress.Success -> {
+                                if(progress.isReceiving){
+                                    vm.setProgressState("FROM $ip", progress)
+                                }
+                                else{
+                                    vm.setProgressState("TO $ip", progress)
+                                }
+                            }
+                            is TransferProgress.Transmitted -> {
+
+                            }
+                            is TransferProgress.WaitingForPermissionToSend -> {
+                                vm.setProgressState("TO $ip", progress)
+                            }
+                            is TransferProgress.WaitingForSender -> {
+                                vm.setProgressState("FROM $ip", progress)
+                            }
+                        }
                     }
                 }
             }
 
-            monitorService?.let { service ->
-                service.setOnFileDiscoveredCallback(object : OnFileDiscovered {
-                    override fun onDirDiscovered(dirName: String) {
-//                        networkService?.let { it.sendDir(dirName) }
-                    }
+            monitorService?.setOnFileDiscoveredCallback(object : OnFileDiscovered {
+                override fun onDirDiscovered(dirName: String) {
+        //                        networkService?.let { it.sendDir(dirName) }
+                }
 
-                    override fun onFileDiscovered(file: File) {
-                        if (file.exists()) {
-//                            networkService?.let { it.sendFile(file) }
-                        }
+                override fun onFileDiscovered(file: File) {
+                    if (file.exists()) {
+        //                            networkService?.let { it.sendFile(file) }
                     }
-                })
-            }
+                }
+            })
 
         }
 
@@ -260,11 +291,8 @@ class MainActivity : ComponentActivity() {
                                     })
                                     { selectedUsers ->
                                         selectedUsers.forEach { user ->
-                                            Log.d("BOTA_USER_LIST", "${user.uname} : ${user.ip}")
-                                                networkService?.sendFiles(
-                                                    user.ip,
-                                                    vm.getSelectedFiles().value
-                                                )
+                                                Log.d("BOTA_USER_LIST", "${user.uname} : ${user.ip}")
+                                                networkService?.sendFiles(user.ip, vm.getSelectedFiles().value)
                                         }
                                         vm.hideUserSelector()
                                     }
