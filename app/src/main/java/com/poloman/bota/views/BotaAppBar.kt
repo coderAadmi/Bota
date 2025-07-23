@@ -17,6 +17,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.poloman.bota.R
+import com.poloman.bota.network.NetworkResponse
 import com.poloman.bota.network.TransferProgress
 import kotlinx.coroutines.flow.StateFlow
 
@@ -26,7 +27,10 @@ fun BotaAppBar(
     destination: Int,
     progressState: StateFlow<Map<String, TransferProgress>>,
     progressDialogState: StateFlow<Boolean>,
-    showDialog : ()-> Unit
+    permissionDialogState : StateFlow<Boolean>,
+    networkReqState : StateFlow<List<NetworkResponse>>,
+    showDialog : ()-> Unit,
+    showPermissionDialog : () -> Unit
 ) {
     var title = when(destination){
         0 -> "BoTA"
@@ -55,15 +59,18 @@ fun BotaAppBar(
                             contentDescription = ""
                         )
                     }
+                }
+
+                if(!permissionDialogState.collectAsState().value && networkReqState.collectAsState().value.isNotEmpty()) {
 
                     Card(
-                        onClick = showDialog,
+                        onClick = showPermissionDialog,
                         modifier = Modifier.padding(4.dp),
                         colors = CardDefaults.cardColors(containerColor = Color(0xFFE8EDF5))
                     ) {
                         Icon(
                             modifier = Modifier.padding(6.dp),
-                            painter = painterResource(R.drawable.download),
+                            painter = painterResource(R.drawable.file),
                             contentDescription = ""
                         )
                     }

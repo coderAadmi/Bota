@@ -114,7 +114,8 @@ class MainActivity : ComponentActivity() {
             networkService?.let { service ->
                 service.networkCallback = object : NetworkService.NetworkCallback {
                     override fun onConnectionRequest(from: String, ip: String) {
-                        vm.setNetworkServiceState(NetworkResponse.ConnectionRequest(from, ip))
+//                        vm.setNetworkServiceState(NetworkResponse.ConnectionRequest(from, ip))
+                        vm.setNetworkReqState(NetworkResponse.ConnectionRequest(from, ip))
                     }
 
                     override fun onDataIncomingRequest(
@@ -139,7 +140,7 @@ class MainActivity : ComponentActivity() {
                         fileCount: Int,
                         size: Long
                     ) {
-                        vm.setNetworkServiceState(
+                        vm.setNetworkReqState(
                             NetworkResponse.IncomingMulDataRequest(
                                 from,
                                 ip,
@@ -147,6 +148,7 @@ class MainActivity : ComponentActivity() {
                                 size
                             )
                         )
+
                     }
 
                     override fun onServerStarted() {
@@ -292,6 +294,7 @@ class MainActivity : ComponentActivity() {
                                     { selectedUsers ->
                                         selectedUsers.forEach { user ->
                                                 Log.d("BOTA_USER_LIST", "${user.uname} : ${user.ip}")
+                                                vm.setProgressState("TO ${user.ip}", TransferProgress.CalculatingSize(user.uname))
                                                 networkService?.sendFiles(user.ip, vm.getSelectedFiles().value)
                                         }
                                         vm.hideUserSelector()
@@ -304,40 +307,50 @@ class MainActivity : ComponentActivity() {
                         }
                         PermissionDialog(
                             modifier = Modifier,
-                            vm.getNetworkResponseState(),
-                            onAccept = { ip: String ->
+                            vm.getPermissionDialogState(),
+                            vm.getNetworkReqState(),
+                            onAccept = { ip: String, req : NetworkResponse ->
                                 networkService?.acceptConnection(ip)
-                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+//                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                                vm.removeNetworkReqState(req)
                             },
-                            onDeny = { ip: String ->
+                            onDeny = { ip: String, req : NetworkResponse ->
                                 networkService?.denyConnection(ip)
-                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+//                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                                vm.removeNetworkReqState(req)
                             },
 
-                            onFileAccept = { ip: String, fname: String, size: Long ->
+                            onFileAccept = { ip: String, fname: String, size: Long, req : NetworkResponse ->
                                 networkService?.acceptFile(ip, fileName = fname, size = size)
-                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+//                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                                vm.removeNetworkReqState(req)
                             },
 
-                            onMulFilesAccept = { ip: String, fcount: Int, size: Long ->
+                            onMulFilesAccept = { ip: String, fcount: Int, size: Long, req : NetworkResponse ->
                                 networkService?.acceptFile(ip, fcount, size)
-                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+//                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                                vm.removeNetworkReqState(req)
                             },
 
-                            onFileDeny = { ip: String ->
+                            onFileDeny = { ip: String, req : NetworkResponse ->
                                 networkService?.denyFile(ip)
-                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+//                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                                vm.removeNetworkReqState(req)
                             }
 
-                        )
+                        ){
+                            // on Dismiss
+                            vm.hidePermissionDialog()
+                        }
 
                         ProgressDialog(vm.getProgressDialogState(),vm.getProgressState()){
                             vm.hideProgressDialog()
                         }
 
-                        BotaAppBar(selectedDestination, vm.getProgressState(), vm.getProgressDialogState()){
-                            vm.showProgressDialog()
-                        }
+                        BotaAppBar(selectedDestination, vm.getProgressState(), vm.getProgressDialogState(),
+                            vm.getPermissionDialogState(), vm.getNetworkReqState(),
+                            { vm.showProgressDialog() }, { vm.showPermissionDialog()}
+                        )
 
 
                         AppNavHost(

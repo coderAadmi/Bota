@@ -116,7 +116,9 @@ class BotaTransferStrategy : SendStrategy {
             try {
                 file.parentFile.mkdirs()
             }
-            catch (e: Exception) {}
+            catch (e: Exception) {
+
+            }
             file.createNewFile()
             val fos = FileOutputStream(file)
 
@@ -136,6 +138,9 @@ class BotaTransferStrategy : SendStrategy {
             fos.close()
             if (totalBytesRead == size){
                 Log.d("BTU_FILE_RECVD","RECVD $fileName")
+                if(totalReadSize == incomingFileSize){
+                    clientCallback.onAllFilesReceived()
+                }
                 return Result.Success
             }
         } catch (e: Exception) {
@@ -190,7 +195,6 @@ class BotaTransferStrategy : SendStrategy {
     }
 
     fun askPermissionToSendFiles(files : List<File>, bos : BufferedOutputStream, bis : BufferedInputStream) {
-        clientCallback.onStartedCalculatingSize()
         var totalFilesSize = 0L
         files.forEach {
             totalFilesSize += it.length()
@@ -206,6 +210,9 @@ class BotaTransferStrategy : SendStrategy {
             totalSentSize = 0L
             files.forEach {
                 sendFile(it, bos, bis)
+            }
+            if(totalSentSize == outGoingFileSize){
+                clientCallback.onAllFilesSent()
             }
         }
         else{

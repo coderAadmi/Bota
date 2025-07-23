@@ -33,10 +33,6 @@ class BotaUser {
             networkCallback.onOutgoingProgressChange(ip, TransferProgress.Transmitted(uname,progress))
         }
 
-        override fun onStartedCalculatingSize() {
-            networkCallback.onStatusChange(ip, TransferProgress.CalculatingSize(uname))
-        }
-
         override fun onWaitingForPermissionToSend() {
             networkCallback.onStatusChange(ip, TransferProgress.WaitingForPermissionToSend(uname))
         }

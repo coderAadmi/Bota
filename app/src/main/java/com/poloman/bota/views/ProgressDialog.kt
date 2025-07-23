@@ -1,5 +1,6 @@
 package com.poloman.bota.views
 
+import android.util.Log
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -31,7 +32,8 @@ fun ProgressDialog(
     isReceiving: Boolean = true,
     onDismiss: () -> Unit
 ) {
-    if (progressDialogState.collectAsState().value)
+    val entries = progressMapState.collectAsState().value.toList()
+    if (progressDialogState.collectAsState().value && entries.isNotEmpty())
         Dialog(onDismissRequest = onDismiss) {
 
             Card(
@@ -49,7 +51,6 @@ fun ProgressDialog(
                         fontWeight = FontWeight.Bold
                     )
 
-                    val entries = progressMapState.collectAsState().value.toList()
                     LazyColumn(modifier = Modifier
                         .fillMaxWidth()
                         .constrainAs(progressLv) {
@@ -59,13 +60,13 @@ fun ProgressDialog(
                         }) {
                         items(entries) {
                             when(it.second){
-
                                 is TransferProgress.Transmitted -> {
                                     val response = it.second as TransferProgress.Transmitted
                                     ProgressCard(Modifier, response.uname, response.progress, isReceiving = it.first.startsWith("FROM"))
                                 }
 
                                 is TransferProgress.CalculatingSize -> {
+                                    Log.d("BTU_CALC","Calculating SIZE")
                                     val response = it.second as TransferProgress.CalculatingSize
                                     StatusCard(Modifier, response.uname, "Calculating size ...", isReceiving = false)
                                 }
@@ -136,7 +137,6 @@ fun StatusCard(
 
             Text( text = status,
                 modifier = Modifier
-                    .height(12.dp)
                     .constrainAs(progressRef) {
                         top.linkTo(unameRef.bottom, margin = 4.dp)
                         start.linkTo(unameRef.start)

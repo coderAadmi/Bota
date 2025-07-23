@@ -1,8 +1,11 @@
 package com.poloman.bota.screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -23,90 +26,188 @@ import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun PermissionDialog(modifier: Modifier,
-                     networkResponseState : StateFlow<NetworkResponse>,
-                     onAccept : (ip : String) -> Unit, onDeny: (ip : String) -> Unit,
-                     onFileAccept : (ip : String, fname : String, size : Long) -> Unit,
-                     onMulFilesAccept : (ip : String, fCount : Int, size : Long) -> Unit,
-                     onFileDeny : (ip : String) -> Unit
+                     isPermissionDialogShown : StateFlow<Boolean>,
+                     networkResponseState : StateFlow<List<NetworkResponse>>,
+                     onAccept : (ip : String, req : NetworkResponse) -> Unit,
+                     onDeny: (ip : String, req : NetworkResponse) -> Unit,
+                     onFileAccept : (ip : String, fname : String, size : Long, req : NetworkResponse) -> Unit,
+                     onMulFilesAccept : (ip : String, fCount : Int, size : Long, req : NetworkResponse) -> Unit,
+                     onFileDeny : (ip : String, req : NetworkResponse) -> Unit,
+                     onDismiss : () -> Unit
 ) {
-    val response = networkResponseState.collectAsState()
+    val response = networkResponseState.collectAsState().value
 
-    when (response.value) {
-        is NetworkResponse.ConnectionRequest -> {
-            val from = response.value as NetworkResponse.ConnectionRequest
-            Dialog(onDismissRequest = { onDeny(from.ip) }) {
-                AcceptConnectionCard(
-                    modifier = modifier.padding(horizontal = 12.dp),
-                    onAccept = {onAccept(from.ip)},
-                    onDeny = {onDeny(from.ip)},
-                    title = "Connection Request",
-                    information = "Accept incoming connection from ${from.name}"
-                )
-            }
-        }
+    if(isPermissionDialogShown.collectAsState().value && response.isNotEmpty())
+    Dialog(onDismissRequest = onDismiss) {
+        Card {
+            LazyColumn {
+                items(response) {
+                    when (it) {
+                        is NetworkResponse.ConnectionRequest -> {
+                            val from = it
+                            AcceptConnectionCard(
+                                modifier = modifier.padding(horizontal = 12.dp),
+                                onAccept = { onAccept(from.ip, from) },
+                                onDeny = { onDeny(from.ip, from) },
+                                title = "Connection Request",
+                                information = "Accept incoming connection from ${from.name}"
+                            )
+                        }
 
-        is NetworkResponse.IncomingDataRequest -> {
-            val request = response.value as NetworkResponse.IncomingDataRequest
-            var sizeInKB = (request.size.toFloat()) /1024
-            var sizeUnit = "KB"
-            var sizeInMB = 0f
-            var sizeShown = sizeInKB
-            if(sizeInKB > 1024){
-                sizeInMB = sizeInKB/1024
-                sizeUnit = "MB"
-                sizeShown = sizeInMB
-            }
-            var sizeInGB = 0f
-            if(sizeInMB > 1024){
-                sizeInGB = sizeInMB/1024
-                sizeUnit = "GB"
-                sizeShown = sizeInGB
-            }
+                        is NetworkResponse.IncomingDataRequest -> {
+                            val request = it
+                            var sizeInKB = (request.size.toFloat()) / 1024
+                            var sizeUnit = "KB"
+                            var sizeInMB = 0f
+                            var sizeShown = sizeInKB
+                            if (sizeInKB > 1024) {
+                                sizeInMB = sizeInKB / 1024
+                                sizeUnit = "MB"
+                                sizeShown = sizeInMB
+                            }
+                            var sizeInGB = 0f
+                            if (sizeInMB > 1024) {
+                                sizeInGB = sizeInMB / 1024
+                                sizeUnit = "GB"
+                                sizeShown = sizeInGB
+                            }
 
-            Dialog(onDismissRequest = { onFileDeny(request.ip) }) {
-                AcceptConnectionCard(
-                    modifier = modifier,
-                    onAccept = { onFileAccept(request.ip, request.filename, request.size ) },
-                    onDeny = { onFileDeny(request.ip) },
-                    title = "Incoming File",
-                    information = "Incoming file from ${request.name} of size $sizeShown $sizeUnit"
-                )
-            }
-        }
+                            AcceptConnectionCard(
+                                modifier = modifier,
+                                onAccept = {
+                                    onFileAccept(
+                                        request.ip,
+                                        request.filename,
+                                        request.size,
+                                        request
+                                    )
+                                },
+                                onDeny = { onFileDeny(request.ip, request) },
+                                title = "Incoming File",
+                                information = "Incoming file from ${request.name} of size $sizeShown $sizeUnit"
+                            )
+                        }
 
-        NetworkResponse.Nothing -> {
-            // Optionally show a Snackbar or Dialog here
-        }
+                        NetworkResponse.Nothing -> {
+                            // Optionally show a Snackbar or Dialog here
+                        }
 
-        is NetworkResponse.IncomingMulDataRequest -> {
-            val request = response.value as NetworkResponse.IncomingMulDataRequest
-            var sizeInKB = (request.size.toFloat()) /1024
-            var sizeUnit = "KB"
-            var sizeInMB = 0f
-            var sizeShown = sizeInKB
-            if(sizeInKB > 1024){
-                sizeInMB = sizeInKB/1024
-                sizeUnit = "MB"
-                sizeShown = sizeInMB
-            }
-            var sizeInGB = 0f
-            if(sizeInMB > 1024){
-                sizeInGB = sizeInMB/1024
-                sizeUnit = "GB"
-                sizeShown = sizeInGB
-            }
+                        is NetworkResponse.IncomingMulDataRequest -> {
+                            val request = it
+                            var sizeInKB = (request.size.toFloat()) / 1024
+                            var sizeUnit = "KB"
+                            var sizeInMB = 0f
+                            var sizeShown = sizeInKB
+                            if (sizeInKB > 1024) {
+                                sizeInMB = sizeInKB / 1024
+                                sizeUnit = "MB"
+                                sizeShown = sizeInMB
+                            }
+                            var sizeInGB = 0f
+                            if (sizeInMB > 1024) {
+                                sizeInGB = sizeInMB / 1024
+                                sizeUnit = "GB"
+                                sizeShown = sizeInGB
+                            }
 
-            Dialog(onDismissRequest = { onFileDeny(request.ip) }) {
-                AcceptConnectionCard(
-                    modifier = modifier,
-                    onAccept = { onMulFilesAccept(request.ip, request.fileCount, request.size) },
-                    onDeny = { onFileDeny(request.ip) },
-                    title = "Incoming Files",
-                    information = "Incoming ${request.fileCount} files from ${request.name} of size $sizeShown $sizeUnit"
-                )
+
+                            AcceptConnectionCard(
+                                modifier = modifier,
+                                onAccept = {
+                                    onMulFilesAccept(
+                                        request.ip,
+                                        request.fileCount,
+                                        request.size,
+                                        request
+                                    )
+                                },
+                                onDeny = { onFileDeny(request.ip, request) },
+                                title = "Incoming Files",
+                                information = "Incoming ${request.fileCount} files from ${request.name} of size $sizeShown $sizeUnit"
+                            )
+                        }
+                    }
+                }
             }
         }
     }
+
+//    when (response.value) {
+//        is NetworkResponse.ConnectionRequest -> {
+//            val from = response.value as NetworkResponse.ConnectionRequest
+//            Dialog(onDismissRequest = { onDeny(from.ip) }) {
+//                AcceptConnectionCard(
+//                    modifier = modifier.padding(horizontal = 12.dp),
+//                    onAccept = {onAccept(from.ip)},
+//                    onDeny = {onDeny(from.ip)},
+//                    title = "Connection Request",
+//                    information = "Accept incoming connection from ${from.name}"
+//                )
+//            }
+//        }
+//
+//        is NetworkResponse.IncomingDataRequest -> {
+//            val request = response.value as NetworkResponse.IncomingDataRequest
+//            var sizeInKB = (request.size.toFloat()) /1024
+//            var sizeUnit = "KB"
+//            var sizeInMB = 0f
+//            var sizeShown = sizeInKB
+//            if(sizeInKB > 1024){
+//                sizeInMB = sizeInKB/1024
+//                sizeUnit = "MB"
+//                sizeShown = sizeInMB
+//            }
+//            var sizeInGB = 0f
+//            if(sizeInMB > 1024){
+//                sizeInGB = sizeInMB/1024
+//                sizeUnit = "GB"
+//                sizeShown = sizeInGB
+//            }
+//
+//            Dialog(onDismissRequest = { onFileDeny(request.ip) }) {
+//                AcceptConnectionCard(
+//                    modifier = modifier,
+//                    onAccept = { onFileAccept(request.ip, request.filename, request.size ) },
+//                    onDeny = { onFileDeny(request.ip) },
+//                    title = "Incoming File",
+//                    information = "Incoming file from ${request.name} of size $sizeShown $sizeUnit"
+//                )
+//            }
+//        }
+//
+//        NetworkResponse.Nothing -> {
+//            // Optionally show a Snackbar or Dialog here
+//        }
+//
+//        is NetworkResponse.IncomingMulDataRequest -> {
+//            val request = response.value as NetworkResponse.IncomingMulDataRequest
+//            var sizeInKB = (request.size.toFloat()) /1024
+//            var sizeUnit = "KB"
+//            var sizeInMB = 0f
+//            var sizeShown = sizeInKB
+//            if(sizeInKB > 1024){
+//                sizeInMB = sizeInKB/1024
+//                sizeUnit = "MB"
+//                sizeShown = sizeInMB
+//            }
+//            var sizeInGB = 0f
+//            if(sizeInMB > 1024){
+//                sizeInGB = sizeInMB/1024
+//                sizeUnit = "GB"
+//                sizeShown = sizeInGB
+//            }
+//
+//            Dialog(onDismissRequest = { onFileDeny(request.ip) }) {
+//                AcceptConnectionCard(
+//                    modifier = modifier,
+//                    onAccept = { onMulFilesAccept(request.ip, request.fileCount, request.size) },
+//                    onDeny = { onFileDeny(request.ip) },
+//                    title = "Incoming Files",
+//                    information = "Incoming ${request.fileCount} files from ${request.name} of size $sizeShown $sizeUnit"
+//                )
+//            }
+//        }
+//    }
 }
 
 @Composable
@@ -119,24 +220,24 @@ fun AcceptConnectionCard(modifier: Modifier, onAccept: () -> Unit, onDeny: () ->
             val (cardTitle, info, accept, deny) = createRefs()
 
             Text(text = title, modifier = Modifier.constrainAs(cardTitle) {
-                top.linkTo(parent.top, margin = 24.dp)
-                start.linkTo(parent.start, margin = 12.dp)
-            }, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                top.linkTo(parent.top, margin = 4.dp)
+                start.linkTo(parent.start, margin = 8.dp)
+            }, fontWeight = FontWeight.Bold)
 
             Text(text = information, modifier = Modifier.constrainAs(info) {
-                top.linkTo(cardTitle.bottom, margin = 16.dp)
-                start.linkTo(parent.start, margin = 12.dp)
-                end.linkTo(parent.end, margin = 12.dp)
+                top.linkTo(cardTitle.bottom, margin = 4.dp)
+                start.linkTo(parent.start, margin = 8.dp)
+                end.linkTo(parent.end, margin = 8.dp)
                 width = Dimension.fillToConstraints
-            }, fontSize = 16.sp)
+            })
 
 
             Button(
                 onClick = onDeny,
                 modifier = Modifier.constrainAs(accept) {
-                    top.linkTo(info.bottom, margin = 24.dp)
-                    bottom.linkTo(parent.bottom, margin = 12.dp)
-                    start.linkTo(parent.start, margin = 12.dp)
+                    top.linkTo(info.bottom, margin = 4.dp)
+                    bottom.linkTo(parent.bottom, margin = 4.dp)
+                    start.linkTo(parent.start, margin = 8.dp)
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = ButtonDefaults.buttonColors().disabledContainerColor)
             ) {
@@ -148,9 +249,9 @@ fun AcceptConnectionCard(modifier: Modifier, onAccept: () -> Unit, onDeny: () ->
                 colors = ButtonDefaults
                     .buttonColors(containerColor = Color(0xFF0A80ED)),
                 modifier = Modifier.constrainAs(deny) {
-                    top.linkTo(info.bottom, margin = 24.dp)
-                    bottom.linkTo(parent.bottom, margin = 12.dp)
-                    end.linkTo(parent.end, margin = 12.dp)
+                    top.linkTo(info.bottom, margin = 4.dp)
+                    bottom.linkTo(parent.bottom, margin = 4.dp)
+                    end.linkTo(parent.end, margin = 8.dp)
                 }) {
                 Text("Accept")
             }

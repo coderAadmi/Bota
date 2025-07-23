@@ -68,6 +68,16 @@ class BotaRepository @Inject constructor(private val appContext : Context,
         ).flow
     }
 
+    private val _isPermDialogShown = MutableStateFlow<Boolean>(false)
+    val isPermDialogShown = _isPermDialogShown.asStateFlow()
+    private val _networkRequestsState = MutableStateFlow<List<NetworkResponse>>(emptyList())
+    val networkRequestsState = _networkRequestsState.asStateFlow()
+    fun setNetworkRequestsState(request: NetworkResponse) {
+        _networkRequestsState.update { oldList ->
+            oldList + request
+        }
+        _isPermDialogShown.value = true
+    }
 
     private val _networkResponseState = MutableStateFlow<NetworkResponse>(NetworkResponse.Nothing)
     val networkResponseState = _networkResponseState.asStateFlow()
@@ -85,7 +95,7 @@ class BotaRepository @Inject constructor(private val appContext : Context,
         return selectedFilesFlow
     }
 
-    private val _userSelectorState = MutableStateFlow<Boolean>(true)
+    private val _userSelectorState = MutableStateFlow<Boolean>(false)
     val userSelectorState = _userSelectorState.asStateFlow()
     fun showUserSelector() {
         _userSelectorState.value = true
@@ -108,7 +118,7 @@ class BotaRepository @Inject constructor(private val appContext : Context,
         return progressState
     }
 
-    private val _progressDialogShown = MutableStateFlow<Boolean>(false)
+    private val _progressDialogShown = MutableStateFlow<Boolean>(true)
     val progressDialogShown = _progressDialogShown.asStateFlow()
 
     fun showProgressDialog(){
@@ -121,6 +131,20 @@ class BotaRepository @Inject constructor(private val appContext : Context,
 
     fun getProgressDialogState(): StateFlow<Boolean> {
         return progressDialogShown
+    }
+
+    fun removeRequest(response: NetworkResponse) {
+        _networkRequestsState.update { oldList ->
+            oldList - response
+        }
+    }
+
+    fun hidePermissionDialog() {
+        _isPermDialogShown.value = false
+    }
+
+    fun showPermissionDialog() {
+        _isPermDialogShown.value = true
     }
 
 }

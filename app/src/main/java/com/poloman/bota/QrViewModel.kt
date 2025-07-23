@@ -28,6 +28,22 @@ class QrViewModel @Inject constructor(private val repository: BotaRepository) : 
         return repository.getFilesByType(fileType).cachedIn(viewModelScope)
     }
 
+    fun setNetworkReqState(request: NetworkResponse) {
+        repository.setNetworkRequestsState(request)
+    }
+
+    fun getNetworkReqState(): StateFlow<List<NetworkResponse>> {
+        return repository.networkRequestsState
+    }
+
+    fun removeNetworkReqState(req : NetworkResponse){
+        repository.removeRequest(req)
+    }
+
+    fun getPermissionDialogState(): StateFlow<Boolean> {
+        return repository.isPermDialogShown
+    }
+
     fun setNetworkServiceState(request: NetworkResponse) {
         repository.setNetworkServiceState(request)
     }
@@ -72,5 +88,13 @@ class QrViewModel @Inject constructor(private val repository: BotaRepository) : 
 
     fun getProgressDialogState(): StateFlow<Boolean> {
         return repository.getProgressDialogState()
+    }
+
+    fun hidePermissionDialog() {
+        repository.hidePermissionDialog()
+    }
+
+    fun showPermissionDialog() {
+        repository.showPermissionDialog()
     }
 }
