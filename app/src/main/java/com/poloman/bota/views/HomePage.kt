@@ -28,6 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.rememberImagePainter
 import com.poloman.bota.QrViewModel
 import com.poloman.bota.network.Communicator
+import com.poloman.bota.network.Helper
 import io.github.g00fy2.quickie.QRResult
 import io.github.g00fy2.quickie.ScanQRCode
 
@@ -68,7 +69,7 @@ fun HomePage(communicator: Communicator) {
             .padding(bottom = 1.dp)
             .background(Color(0xFFF7FAFC))
     ) {
-        val ( strategy, genQR, scanQR, qrImg) = createRefs()
+        val ( strategy, genQR, scanQR, qrImg, ipRef) = createRefs()
         val context = LocalContext.current
 
 
@@ -140,7 +141,13 @@ fun HomePage(communicator: Communicator) {
                         width = Dimension.fillToConstraints
                         height = Dimension.fillToConstraints
 
-                    })
+                    }
+            )
+
+            Text(text = Helper.getdeviceIpAddress(), modifier = Modifier.constrainAs(ipRef) {
+                top.linkTo(qrImg.bottom, margin = 16.dp)
+                centerHorizontallyTo(parent)
+            }, color = Color.Black, fontWeight = FontWeight.Bold)
         }
 
     }
