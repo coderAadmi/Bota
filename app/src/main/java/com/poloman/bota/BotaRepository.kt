@@ -16,11 +16,15 @@ import com.github.alexzhirkevich.customqrgenerator.vector.style.QrVectorLogoShap
 import com.poloman.bota.network.Helper
 import com.poloman.bota.network.NetworkResponse
 import com.poloman.bota.network.TransferProgress
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 class BotaRepository @Inject constructor(private val appContext : Context,
@@ -111,6 +115,14 @@ class BotaRepository @Inject constructor(private val appContext : Context,
     fun setProgressMapState(ip : String, progress: TransferProgress){
         _progressState.update { oldMap ->
             oldMap + (ip to progress)
+        }
+        if(progress is TransferProgress.Success){
+            CoroutineScope(Dispatchers.IO).launch {
+                delay(2000)
+                val map = _progressState.value.toMutableMap()
+                map.remove(ip)
+                _progressState.value = map
+            }
         }
     }
 

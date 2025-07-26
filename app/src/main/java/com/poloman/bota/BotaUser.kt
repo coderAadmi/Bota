@@ -7,6 +7,9 @@ import com.poloman.bota.network.BotaClient
 import com.poloman.bota.network.BotaClientCallback
 import com.poloman.bota.network.NetworkService
 import com.poloman.bota.network.TransferProgress
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 
 class BotaUser {
@@ -15,6 +18,7 @@ class BotaUser {
     lateinit var uname: String
     lateinit var ip: String
     lateinit var networkCallback: NetworkService.NetworkCallback
+    lateinit var connectionAcceptedFromServer : (BotaUser) -> Unit
 
     val clientCallback = object : BotaClientCallback{
         override fun onFileIncomingRequest(filename: String, size: Long) {
@@ -31,6 +35,10 @@ class BotaUser {
 
         override fun onOutgoingProgressChange(progress: Int) {
             networkCallback.onOutgoingProgressChange(ip, TransferProgress.Transmitted(uname,progress))
+        }
+
+        override fun onConnectionAccepted() {
+            connectionAcceptedFromServer(this@BotaUser)
         }
 
         override fun onWaitingForPermissionToSend() {
@@ -73,8 +81,15 @@ class BotaUser {
         }
     }
 
+    fun setConnectionAcceptedLambda(lambda : (BotaUser) -> Unit){
+        connectionAcceptedFromServer = lambda
+    }
+
     @RequiresApi(Build.VERSION_CODES.R)
     fun startListening(){
+        CoroutineScope(Dispatchers.IO).launch {
+            commander.sendCommand("ACCEPTED_CONNECTION")
+        }
         listener.startListening()
     }
 
@@ -120,5 +135,11 @@ class BotaUser {
 
     fun denyFile(){
         listener.denyFile()
+    }
+
+    fun updateUserName(newName: String) {
+        commander.updateName(newName)
+        listener.updateName(newName)
+
     }
 }

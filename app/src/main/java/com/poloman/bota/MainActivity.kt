@@ -11,6 +11,7 @@ import android.os.Environment
 import android.os.IBinder
 import android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -42,7 +43,7 @@ import com.poloman.bota.network.NetworkService
 import com.poloman.bota.network.TransferProgress
 import com.poloman.bota.screen.AppNavHost
 import com.poloman.bota.screen.Destination
-import com.poloman.bota.screen.PermissionDialog
+import com.poloman.bota.views.PermissionDialog
 import com.poloman.bota.service.MonitorService
 import com.poloman.bota.service.OnFileDiscovered
 import com.poloman.bota.ui.theme.BotaTheme
@@ -50,6 +51,9 @@ import com.poloman.bota.views.BotaAppBar
 import com.poloman.bota.views.ConnectedUsersDialog
 import com.poloman.bota.views.ProgressDialog
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 
 @AndroidEntryPoint
@@ -59,11 +63,12 @@ class MainActivity : ComponentActivity() {
     val requestSettingLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
             if (Environment.isExternalStorageManager()) {
-                Log.d("PER_SET", Environment.getRootDirectory().path)
-                monitor()
+                networkService?.initServer()
             } else {
                 //show user error
                 Log.d("PER_SET", "Setting not granted")
+                Toast.makeText(this,"Can not perform data transfer without storage access",
+                    Toast.LENGTH_SHORT).show()
             }
 
         }
@@ -223,20 +228,22 @@ class MainActivity : ComponentActivity() {
     val connector = object : Communicator {
         @RequiresApi(Build.VERSION_CODES.R)
         override fun onStartServer() {
-            networkService?.let {
-                it.initServer()
-            }
+            checkStoragePermissions()
         }
 
         override fun onConnectToServer(ip: String) {
-            networkService?.let {
-                it.connectToServer(ip)
-            }
+            networkService?.connectToServer(ip)
 
         }
 
         override fun showConnectedDevices() {
-            vm.showUserSelector()
+            if(vm.getSelectedFiles().value.isEmpty()){
+                Toast.makeText(this@MainActivity,"Select some files to transfer",
+                    Toast.LENGTH_SHORT).show()
+            }
+            else {
+                vm.showUserSelector()
+            }
         }
 
     }
@@ -292,12 +299,28 @@ class MainActivity : ComponentActivity() {
                                         vm.hideUserSelector()
                                     })
                                     { selectedUsers ->
-                                        selectedUsers.forEach { user ->
-                                                Log.d("BOTA_USER_LIST", "${user.uname} : ${user.ip}")
-                                                vm.setProgressState("TO ${user.ip}", TransferProgress.CalculatingSize(user.uname))
-                                                networkService?.sendFiles(user.ip, vm.getSelectedFiles().value)
+                                        if(selectedUsers.isEmpty()) {
+                                            Toast.makeText(this@MainActivity,"Please select a user to send the files",
+                                                Toast.LENGTH_SHORT).show()
                                         }
-                                        vm.hideUserSelector()
+                                        else{
+                                            vm.hideUserSelector()
+                                            vm.showProgressDialog()
+                                            selectedUsers.forEach { user ->
+                                                Log.d(
+                                                    "BOTA_USER_LIST",
+                                                    "${user.uname} : ${user.ip}"
+                                                )
+                                                vm.setProgressState(
+                                                    "TO ${user.ip}",
+                                                    TransferProgress.CalculatingSize(user.uname)
+                                                )
+                                                networkService?.sendFiles(
+                                                    user.ip,
+                                                    vm.getSelectedFiles().value
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -364,7 +387,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        startMonitorService()
+//        startMonitorService()
         startNetService()
 
     }
@@ -399,6 +422,17 @@ class MainActivity : ComponentActivity() {
             startForegroundService(it)
         }
         bindService(Intent(this, NetworkService::class.java), netConnection, BIND_ABOVE_CLIENT)
+    }
+
+    fun checkStoragePermissions(){
+        if (!Environment.isExternalStorageManager()) {
+            Toast.makeText(this,"Storage access is required to write files to memory",
+                Toast.LENGTH_SHORT).show()
+            requestSettingLauncher.launch(Intent(ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+        } else {
+            Log.d("PER_SET", Environment.getRootDirectory().path)
+            networkService?.initServer()
+        }
     }
 
     override fun onDestroy() {

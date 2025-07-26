@@ -55,8 +55,9 @@ fun BotaAppBar(
                     ) {
                         Icon(
                             modifier = Modifier.padding(6.dp),
-                            painter = painterResource(R.drawable.upload),
-                            contentDescription = ""
+                            painter = painterResource(R.drawable.progress),
+                            contentDescription = "",
+                            tint = Color(0xFF0A80ED)
                         )
                     }
                 }
@@ -70,8 +71,9 @@ fun BotaAppBar(
                     ) {
                         Icon(
                             modifier = Modifier.padding(6.dp),
-                            painter = painterResource(R.drawable.file),
-                            contentDescription = ""
+                            painter = painterResource(R.drawable.permission),
+                            contentDescription = "",
+                            tint = Color(0xFF0A80ED)
                         )
                     }
                 }

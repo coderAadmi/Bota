@@ -11,7 +11,6 @@ import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.Binder
 import android.os.Build
-import android.os.Environment
 import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresApi
@@ -40,6 +39,8 @@ class NetworkService : Service() {
         fun onStatusChange(ip: String, progress: TransferProgress)
     }
 
+    var serverName = "${android.os.Build.BRAND} ${android.os.Build.MODEL} ${android.os.Build.USER}"
+
     var networkCallback: NetworkCallback? = null
 
     inner class NetworkServiceBinder : Binder() {
@@ -50,7 +51,7 @@ class NetworkService : Service() {
     private lateinit var notificationManager: NotificationManager
 
     val botaServer by lazy {
-        BotaServer(3443, networkCallback!!)
+        BotaServer(3443, serverName, networkCallback!!)
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -188,6 +189,10 @@ class NetworkService : Service() {
         CoroutineScope(Dispatchers.IO).launch {
             botaServer.denyFile(ip)
         }
+    }
+
+    fun setUserName(name : String) {
+        botaServer.updateUserName(name)
     }
 }
 

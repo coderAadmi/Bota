@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -30,7 +31,9 @@ import com.poloman.bota.BotaUser
 
 
 @Composable
-fun ConnectedUsersDialog(connectedUsers: List<BotaUser>,  onDismiss : () -> Unit, onSend :(users : List<BotaUser>) -> Unit){
+fun ConnectedUsersDialog(connectedUsers: List<BotaUser>,
+                         onDismiss : () -> Unit,
+                         onSend :(users : List<BotaUser>) -> Unit){
 
     Dialog(onDismissRequest = onDismiss) {
         ConnectedUsers(connectedUsers){
@@ -43,6 +46,8 @@ fun ConnectedUsersDialog(connectedUsers: List<BotaUser>,  onDismiss : () -> Unit
 @Composable
 fun ConnectedUsers(connectedUsers: List<BotaUser>, onSend : (users : List<BotaUser>) -> Unit) {
     val selectedUsers = mutableListOf<BotaUser>()
+    var btnColor by remember { mutableStateOf(Color(0xFFE8EDF5)) }
+    var textColor by remember { mutableStateOf(Color.Black) }
     Card(
         colors = CardDefaults.cardColors(containerColor = Color(0xFFF7FAFC))) {
         ConstraintLayout {
@@ -67,17 +72,27 @@ fun ConnectedUsers(connectedUsers: List<BotaUser>, onSend : (users : List<BotaUs
                             true -> selectedUsers.add(it)
                             false -> selectedUsers.remove(it)
                         }
+                        if(selectedUsers.isNotEmpty()){
+                            btnColor = Color(0xFF0A80ED)
+                            textColor = Color.White
+                        }
+                        else{
+                            btnColor = Color(0xFFE8EDF5)
+                            textColor = Color.Black
+                        }
                     }
                 }
             }
 
             Button(onClick = {
                 onSend(selectedUsers)
-            }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).constrainAs(sendBtn) {
+            },
+                colors = ButtonDefaults.buttonColors(containerColor = btnColor),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).constrainAs(sendBtn) {
                 centerHorizontallyTo(parent)
                 bottom.linkTo(parent.bottom, margin = 12.dp)
             }) {
-                Text("Send")
+                Text("Send", color = textColor)
             }
         }
     }

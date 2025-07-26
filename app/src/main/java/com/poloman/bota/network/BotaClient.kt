@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
-import com.poloman.bota.BotaUser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -17,6 +16,7 @@ import java.net.UnknownHostException
 
 class BotaClient {
 
+    private lateinit var userName : String
     private lateinit var socket: Socket
     private var host: String
     private var port = 0
@@ -33,15 +33,17 @@ class BotaClient {
     lateinit var onDisconnect : () -> Unit
 
     @RequiresApi(Build.VERSION_CODES.R)
-    constructor(host : String, port : Int){
+    constructor(host : String, port : Int, uName: String){
         this.host = host
         this.port = port
+        this.userName = uName
         connectToServer()
     }
 
-    constructor(socket: Socket, onDisconnect : () -> Unit = {}){
+    constructor(socket: Socket, uName : String,  onDisconnect : () -> Unit = {}){
         this.socket = socket
-        this.host = ""
+        this.host = socket.inetAddress.toString()
+        this.userName = uName
         bos = BufferedOutputStream(socket.outputStream)
         bos.flush()
         bis = BufferedInputStream(socket.inputStream)
@@ -96,7 +98,7 @@ class BotaClient {
                     else if(result.result.startsWith("UNAME")){
                         val serverName = result.result.substringAfter("UNAME ")
                         Log.d("BTU_SENDING_NAME", "To server $serverName")
-                        sendCommand("UNAME Poloman-Android")
+                        sendCommand("UNAME $userName")
                         onNameAsked(serverName)
                     }
                     else if(result.result.startsWith("FILE_INCOMING_PERMISSION")){
@@ -110,6 +112,9 @@ class BotaClient {
                         val sizeResult = recv() as Result.CommandResponse
                         val size = sizeResult.result.substringAfter("FILE_SIZE ").toLong()
                         callback.onMultipleFileIncomingRequest(fileCount,size)
+                    }
+                    else if(result.result.startsWith("ACCEPTED_CONNECTION")){
+                        callback.onConnectionAccepted()
                     }
                 }
             }
@@ -180,5 +185,9 @@ class BotaClient {
 
     fun denyFile(){
         sendCommand("DENIED")
+    }
+
+    fun updateName(newName: String) {
+
     }
 }
