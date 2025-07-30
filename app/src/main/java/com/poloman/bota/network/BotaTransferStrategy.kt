@@ -20,6 +20,8 @@ class BotaTransferStrategy : SendStrategy {
     private var totalSentSize = 0L
     private var totalReadSize = 0L
     private lateinit var clientCallback: BotaClientCallback
+    private var lastSendProgress = 0
+    private var lastReceiveProgress = 0
 
     @RequiresApi(Build.VERSION_CODES.R)
     val root = "${Environment.getExternalStorageDirectory().path}${File.separator}BotaStorage${File.separator}"
@@ -27,6 +29,7 @@ class BotaTransferStrategy : SendStrategy {
     fun setFileIncomingSize(incomSize : Long){
         incomingFileSize = incomSize
         totalReadSize = 0L
+        lastReceiveProgress = 0
     }
 
     fun setCallback(callback : BotaClientCallback){
@@ -61,7 +64,11 @@ class BotaTransferStrategy : SendStrategy {
                     bytesSent += readBytes
 //                    Log.d("BTU_BYTES_SENT","Bytes Sent $readBytes  Total : $bytesSent" )
                     totalSentSize += readBytes
-                    clientCallback.onOutgoingProgressChange((100*(totalSentSize.toFloat() / outGoingFileSize)).toInt())
+                    val newProgress = (100*(totalSentSize.toFloat() / outGoingFileSize)).toInt()
+                    if(newProgress > lastSendProgress){
+                        clientCallback.onOutgoingProgressChange(newProgress)
+                        lastSendProgress = newProgress
+                    }
                     readBytes = fis.read(byteArray,0,ftSize)
                 }
                 bos.flush()
@@ -130,9 +137,12 @@ class BotaTransferStrategy : SendStrategy {
                     break
                 fos.write(byteArray, 0, readBytes)
                 totalBytesRead += readBytes
-//                Log.d("BTU_RCV_FILE","readBytes $readBytes  Total : $totalBytesRead")
                 totalReadSize += readBytes
-                clientCallback.onIncomingProgressChange( (100 * (totalReadSize.toFloat() / incomingFileSize)).toInt() )
+                val newProgress = (100 * (totalReadSize.toFloat() / incomingFileSize)).toInt()
+                if(newProgress > lastReceiveProgress){
+                    clientCallback.onIncomingProgressChange( newProgress )
+                    lastReceiveProgress = newProgress
+                }
             }
             fos.flush()
             fos.close()
@@ -208,6 +218,7 @@ class BotaTransferStrategy : SendStrategy {
             clientCallback.onRequestAccepted()
             outGoingFileSize = totalFilesSize
             totalSentSize = 0L
+            lastSendProgress = 0
             files.forEach {
                 sendFile(it, bos, bis)
             }

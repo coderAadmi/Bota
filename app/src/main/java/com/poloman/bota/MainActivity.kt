@@ -117,9 +117,8 @@ class MainActivity : ComponentActivity() {
             Log.d("BTU_BND", "Net Service bound")
 
             networkService?.let { service ->
-                service.networkCallback = object : NetworkService.NetworkCallback {
+                service.networkCallbackFromActivity = object : NetworkService.NetworkCallback {
                     override fun onConnectionRequest(from: String, ip: String) {
-//                        vm.setNetworkServiceState(NetworkResponse.ConnectionRequest(from, ip))
                         vm.setNetworkReqState(NetworkResponse.ConnectionRequest(from, ip))
                     }
 
@@ -191,7 +190,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             is TransferProgress.Transmitted -> {
-
                             }
                             is TransferProgress.WaitingForPermissionToSend -> {
                                 vm.setProgressState("TO $ip", progress)
@@ -424,6 +422,7 @@ class MainActivity : ComponentActivity() {
         bindService(Intent(this, NetworkService::class.java), netConnection, BIND_ABOVE_CLIENT)
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     fun checkStoragePermissions(){
         if (!Environment.isExternalStorageManager()) {
             Toast.makeText(this,"Storage access is required to write files to memory",

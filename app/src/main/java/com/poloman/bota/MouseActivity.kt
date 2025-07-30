@@ -52,7 +52,7 @@ class MouseActivity : ComponentActivity(), SensorEventListener {
             Log.d("BTU_BND", "Net Service bound")
 
             networkService?.let { service ->
-                service.networkCallback = object : NetworkService.NetworkCallback{
+                service.networkCallbackFromActivity = object : NetworkService.NetworkCallback{
                     override fun onConnectionRequest(from: String, ip: String) {
                         TODO("Not yet implemented")
                     }

@@ -15,6 +15,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import com.poloman.bota.BotaUser
 import com.poloman.bota.R
@@ -27,9 +28,9 @@ import kotlin.collections.mutableListOf
 
 
 @SuppressLint("NewApi")
-class NetworkService : Service() {
+class NetworkService : Service(), NetworkService.NetworkCallback {
 
-    interface NetworkCallback {
+    public interface NetworkCallback {
         fun onConnectionRequest(from: String, ip: String)
         fun onDataIncomingRequest(from: String, ip: String, fileName: String, size: Long)
         fun onMultipleFilesIncomingRequest(from: String, ip: String, fileCount: Int, size: Long)
@@ -39,9 +40,9 @@ class NetworkService : Service() {
         fun onStatusChange(ip: String, progress: TransferProgress)
     }
 
-    var serverName = "${android.os.Build.BRAND} ${android.os.Build.MODEL} ${android.os.Build.USER}"
+    var serverName = "${Build.BRAND} ${Build.MODEL} ${Build.USER}"
 
-    var networkCallback: NetworkCallback? = null
+    var networkCallbackFromActivity: NetworkCallback? = null
 
     inner class NetworkServiceBinder : Binder() {
         fun getService(): NetworkService = this@NetworkService
@@ -51,7 +52,7 @@ class NetworkService : Service() {
     private lateinit var notificationManager: NotificationManager
 
     val botaServer by lazy {
-        BotaServer(3443, serverName, networkCallback!!)
+        BotaServer(3443, serverName, this)
     }
 
     override fun onBind(intent: Intent?): IBinder? {
@@ -125,30 +126,55 @@ class NetworkService : Service() {
         try {
 
             createServiceNotificationChannel()
-            val notification: Notification = NotificationCompat.Builder(this, "CHANNEL_ID")
-                .setContentTitle("BoTA Network")
-                .setContentText("BoTA Server running")
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
-                .build()
-
-            // Start the service in the foreground
-            ServiceCompat.startForeground(
-                this,
-                101, notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-            )
+            createNotification()
         } catch (e: Exception) {
             Log.d("PER_EX", e.toString())
         }
     }
 
+    private fun createNotification() {
+        val notification: Notification = NotificationCompat.Builder(this, "Bota-App")
+            .setContentTitle("BoTA Network")
+            .setContentText("BoTA Server running")
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .build()
+
+        // Start the service in the foreground
+        ServiceCompat.startForeground(
+            this,
+            101, notification,
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        )
+    }
+
+    @SuppressLint("RemoteViewLayout", "MissingPermission")
+    fun createTransmissionNotification(clientId : String, cName : String, progress: Int) {
+
+        val title = if (clientId.startsWith("FROM")) "Receiving from $cName" else "Sending to $cName"
+
+        val builder = NotificationCompat.Builder(this, "Bota-App")
+            .setContentTitle(title)
+            .setContentText("Progress: $progress%")
+            .setSmallIcon(R.drawable.download)
+            .setOngoing(progress<100)
+            .setProgress(100,progress,false)
+            .setOnlyAlertOnce(true)
+
+        NotificationManagerCompat.from(this).notify(clientId.hashCode(), builder.build())
+
+        if(progress == 100){
+            NotificationManagerCompat.from(this).cancel(clientId.hashCode())
+        }
+
+    }
+
     private fun createServiceNotificationChannel() {
         val channel = NotificationChannel(
-            "CHANNEL_ID",
-            "Foreground Service channel",
-            NotificationManager.IMPORTANCE_DEFAULT
+            "Bota-App",
+            "Bota Network running",
+            NotificationManager.IMPORTANCE_LOW
         )
-        channel.lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+        channel.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         notificationManager.createNotificationChannel(channel)
     }
 
@@ -193,6 +219,57 @@ class NetworkService : Service() {
 
     fun setUserName(name : String) {
         botaServer.updateUserName(name)
+    }
+
+    override fun onConnectionRequest(from: String, ip: String) {
+        networkCallbackFromActivity?.onConnectionRequest(from,ip)
+    }
+
+    override fun onDataIncomingRequest(
+        from: String,
+        ip: String,
+        fileName: String,
+        size: Long
+    ) {
+        networkCallbackFromActivity?.onDataIncomingRequest(from, ip, fileName, size)
+    }
+
+    override fun onMultipleFilesIncomingRequest(
+        from: String,
+        ip: String,
+        fileCount: Int,
+        size: Long
+    ) {
+        networkCallbackFromActivity?.onMultipleFilesIncomingRequest(from, ip, fileCount, size)
+    }
+
+    override fun onServerStarted() {
+        networkCallbackFromActivity?.onServerStarted()
+    }
+
+    override fun onIncomingProgressChange(
+        ip: String,
+        progress: TransferProgress
+    ) {
+        val tpo = (progress as TransferProgress.Transmitted)
+        createTransmissionNotification("FROM $ip",tpo.uname,tpo.progress)
+        networkCallbackFromActivity?.onIncomingProgressChange(ip, progress)
+    }
+
+    override fun onOutgoingProgressChange(
+        ip: String,
+        progress: TransferProgress
+    ) {
+        val tpo = (progress as TransferProgress.Transmitted)
+        createTransmissionNotification("TO $ip",tpo.uname,tpo.progress)
+        networkCallbackFromActivity?.onOutgoingProgressChange(ip, progress)
+    }
+
+    override fun onStatusChange(
+        ip: String,
+        progress: TransferProgress
+    ) {
+        networkCallbackFromActivity?.onStatusChange(ip, progress)
     }
 }
 
