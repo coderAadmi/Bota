@@ -15,6 +15,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -72,6 +77,8 @@ fun HomePage(communicator: Communicator) {
         val ( strategy, genQR, scanQR, qrImg, ipRef) = createRefs()
         val context = LocalContext.current
 
+        var serverBtnText by rememberSaveable { mutableStateOf("Start Server") }
+        var serverBtnColor by remember { mutableStateOf(Color(0xFF0A80ED)) }
 
         Text(
             "Choose how you want to connect to other devices on your local network",
@@ -87,7 +94,7 @@ fun HomePage(communicator: Communicator) {
                 communicator.onStartServer()
             },
             colors = ButtonDefaults
-                .buttonColors(containerColor = Color(0xFF0A80ED)), modifier = Modifier
+                .buttonColors(containerColor = serverBtnColor), modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
                 .constrainAs(genQR) {
@@ -95,7 +102,7 @@ fun HomePage(communicator: Communicator) {
                     centerHorizontallyTo(parent)
                 }) {
 
-            Text("Generate QR", fontWeight = FontWeight.Bold)
+            Text(serverBtnText, fontWeight = FontWeight.Bold)
         }
 
         Button(
@@ -129,6 +136,8 @@ fun HomePage(communicator: Communicator) {
 
 
         qrVm.getQrCodeState().collectAsState().value?.let {
+            serverBtnText = "Stop Server"
+            serverBtnColor = Color.Black
             Image(
                 painter = rememberImagePainter(it),
                 contentDescription = "",
@@ -148,6 +157,9 @@ fun HomePage(communicator: Communicator) {
                 top.linkTo(qrImg.bottom, margin = 16.dp)
                 centerHorizontallyTo(parent)
             }, color = Color.Black, fontWeight = FontWeight.Bold)
+        }?:run {
+            serverBtnText = "Start Server"
+            serverBtnColor = Color(0xFF0A80ED)
         }
 
     }

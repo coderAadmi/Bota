@@ -97,4 +97,8 @@ class QrViewModel @Inject constructor(private val repository: BotaRepository) : 
     fun showPermissionDialog() {
         repository.showPermissionDialog()
     }
+
+    fun serverStopped() {
+        repository.severStopped()
+    }
 }

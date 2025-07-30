@@ -159,4 +159,8 @@ class BotaRepository @Inject constructor(private val appContext : Context,
         _isPermDialogShown.value = true
     }
 
+    fun severStopped() {
+        _qrCodeDrawable.value = null
+    }
+
 }

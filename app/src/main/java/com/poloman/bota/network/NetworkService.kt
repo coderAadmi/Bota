@@ -1,12 +1,15 @@
 package com.poloman.bota.network
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.Binder
@@ -18,6 +21,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import com.poloman.bota.BotaUser
+import com.poloman.bota.MainActivity
 import com.poloman.bota.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +39,7 @@ class NetworkService : Service(), NetworkService.NetworkCallback {
         fun onDataIncomingRequest(from: String, ip: String, fileName: String, size: Long)
         fun onMultipleFilesIncomingRequest(from: String, ip: String, fileCount: Int, size: Long)
         fun onServerStarted()
+        fun onServerStopped()
         fun onIncomingProgressChange(ip: String, progress: TransferProgress)
         fun onOutgoingProgressChange(ip: String, progress: TransferProgress)
         fun onStatusChange(ip: String, progress: TransferProgress)
@@ -50,6 +55,7 @@ class NetworkService : Service(), NetworkService.NetworkCallback {
 
     private val binder = NetworkServiceBinder()
     private lateinit var notificationManager: NotificationManager
+    var isAppInBackground : Boolean = false
 
     val botaServer by lazy {
         BotaServer(3443, serverName, this)
@@ -147,25 +153,47 @@ class NetworkService : Service(), NetworkService.NetworkCallback {
         )
     }
 
-    @SuppressLint("RemoteViewLayout", "MissingPermission")
-    fun createTransmissionNotification(clientId : String, cName : String, progress: Int) {
+    fun createTransmissionNotification(clientId: String, cName: String, progress: Int) {
 
-        val title = if (clientId.startsWith("FROM")) "Receiving from $cName" else "Sending to $cName"
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+            val title =
+                if (clientId.startsWith("FROM")) "Receiving from $cName" else "Sending to $cName"
 
-        val builder = NotificationCompat.Builder(this, "Bota-App")
-            .setContentTitle(title)
-            .setContentText("Progress: $progress%")
-            .setSmallIcon(R.drawable.download)
-            .setOngoing(progress<100)
-            .setProgress(100,progress,false)
-            .setOnlyAlertOnce(true)
+            val builder = NotificationCompat.Builder(this, "Bota-App")
+                .setContentTitle(title)
+                .setContentText("Progress: $progress%")
+                .setSmallIcon(R.drawable.download)
+                .setOngoing(progress < 100)
+                .setProgress(100, progress, false)
+                .setOnlyAlertOnce(true)
 
-        NotificationManagerCompat.from(this).notify(clientId.hashCode(), builder.build())
+            NotificationManagerCompat.from(this).notify(clientId.hashCode(), builder.build())
 
-        if(progress == 100){
-            NotificationManagerCompat.from(this).cancel(clientId.hashCode())
+            if (progress == 100) {
+                NotificationManagerCompat.from(this).cancel(clientId.hashCode())
+            }
         }
+    }
 
+    fun createPermissionNotification(clientId : String, requestText : String) {
+
+        if(checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+
+            val intent = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            val pendingIntent: PendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+            val builder = NotificationCompat.Builder(this, "Bota-App")
+                .setContentTitle("Permission Request")
+                .setContentText(requestText)
+                .setSmallIcon(R.drawable.download)
+                .setOnlyAlertOnce(true)
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+
+            NotificationManagerCompat.from(this).notify(clientId.hashCode(), builder.build())
+
+        }
     }
 
     private fun createServiceNotificationChannel() {
@@ -217,12 +245,15 @@ class NetworkService : Service(), NetworkService.NetworkCallback {
         }
     }
 
-    fun setUserName(name : String) {
+    fun setUserName(name: String) {
         botaServer.updateUserName(name)
     }
 
     override fun onConnectionRequest(from: String, ip: String) {
-        networkCallbackFromActivity?.onConnectionRequest(from,ip)
+        if(isAppInBackground){
+            createPermissionNotification(ip,"Connection request from $from")
+        }
+        networkCallbackFromActivity?.onConnectionRequest(from, ip)
     }
 
     override fun onDataIncomingRequest(
@@ -240,6 +271,9 @@ class NetworkService : Service(), NetworkService.NetworkCallback {
         fileCount: Int,
         size: Long
     ) {
+        if(isAppInBackground){
+            createPermissionNotification(ip,"Incoming files $from")
+        }
         networkCallbackFromActivity?.onMultipleFilesIncomingRequest(from, ip, fileCount, size)
     }
 
@@ -247,12 +281,16 @@ class NetworkService : Service(), NetworkService.NetworkCallback {
         networkCallbackFromActivity?.onServerStarted()
     }
 
+    override fun onServerStopped() {
+        networkCallbackFromActivity?.onServerStopped()
+    }
+
     override fun onIncomingProgressChange(
         ip: String,
         progress: TransferProgress
     ) {
         val tpo = (progress as TransferProgress.Transmitted)
-        createTransmissionNotification("FROM $ip",tpo.uname,tpo.progress)
+        createTransmissionNotification("FROM $ip", tpo.uname, tpo.progress)
         networkCallbackFromActivity?.onIncomingProgressChange(ip, progress)
     }
 
@@ -261,7 +299,7 @@ class NetworkService : Service(), NetworkService.NetworkCallback {
         progress: TransferProgress
     ) {
         val tpo = (progress as TransferProgress.Transmitted)
-        createTransmissionNotification("TO $ip",tpo.uname,tpo.progress)
+        createTransmissionNotification("TO $ip", tpo.uname, tpo.progress)
         networkCallbackFromActivity?.onOutgoingProgressChange(ip, progress)
     }
 
@@ -270,6 +308,10 @@ class NetworkService : Service(), NetworkService.NetworkCallback {
         progress: TransferProgress
     ) {
         networkCallbackFromActivity?.onStatusChange(ip, progress)
+    }
+
+    fun stopServer() {
+        botaServer.stopServer()
     }
 }
 

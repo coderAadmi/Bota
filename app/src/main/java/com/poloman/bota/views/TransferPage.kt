@@ -97,6 +97,7 @@ fun TransferPage(communicator: Communicator) {
             onClick = {
                 filePickerLauncher.launch("*/*")
             },
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFE8EDF5)),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding( horizontal = 12.dp)
@@ -116,7 +117,7 @@ fun TransferPage(communicator: Communicator) {
                     centerVerticallyTo(parent)
                     start.linkTo(ic.end, margin  = 8.dp)
                     end.linkTo(parent.end, margin = 12.dp)
-                })
+                }, fontWeight = FontWeight.Bold)
             }
         }
 

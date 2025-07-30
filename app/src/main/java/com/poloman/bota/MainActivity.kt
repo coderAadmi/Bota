@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.navigation.compose.rememberNavController
+import com.poloman.bota.network.BotaServer
 import com.poloman.bota.network.Communicator
 import com.poloman.bota.network.NetworkResponse
 import com.poloman.bota.network.NetworkService
@@ -159,6 +160,10 @@ class MainActivity : ComponentActivity() {
                         vm.generateQrCode()
                     }
 
+                    override fun onServerStopped() {
+                        vm.serverStopped()
+                    }
+
                     override fun onIncomingProgressChange(ip: String, progress: TransferProgress) {
                         Log.d("BOTA_IN_PROGRESS","From $ip progress $progress %")
                         vm.setProgressState("FROM $ip", progress)
@@ -218,6 +223,7 @@ class MainActivity : ComponentActivity() {
 
         override fun onServiceDisconnected(name: ComponentName?) {
             networkService = null
+
             Log.d("BTU_BND", "Network Service Unbound")
         }
 
@@ -226,6 +232,10 @@ class MainActivity : ComponentActivity() {
     val connector = object : Communicator {
         @RequiresApi(Build.VERSION_CODES.R)
         override fun onStartServer() {
+            if(networkService?.getServerState()!!.value == BotaServer.ServerState.Running){
+                networkService?.stopServer()
+            }
+            else
             checkStoragePermissions()
         }
 
@@ -435,10 +445,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         try {
             if (netConnection != null) {
-                unbindService(netConnection)
+                networkService?.stopSelf()
             }
             if (connection != null) {
                 unbindService(connection)
@@ -448,5 +457,19 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
 
         }
+        finally {
+            super.onDestroy()
+        }
     }
+
+    override fun onStop() {
+        networkService?.isAppInBackground = true
+        super.onStop()
+    }
+
+    override fun onResume() {
+        networkService?.isAppInBackground = false
+        super.onResume()
+    }
+
 }

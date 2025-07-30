@@ -79,6 +79,10 @@ class MouseActivity : ComponentActivity(), SensorEventListener {
                         TODO("Not yet implemented")
                     }
 
+                    override fun onServerStopped() {
+                        TODO("Not yet implemented")
+                    }
+
                     override fun onIncomingProgressChange(
                         ip: String,
                         progress: TransferProgress

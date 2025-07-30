@@ -53,6 +53,7 @@ class BotaServer {
             acceptClients()
         } catch (e: IOException) {
             Log.d("BTU_SERVER_INIT", "Exception ${e.toString()}")
+            networkCallback.onServerStarted()
             _serverState.value = ServerState.Error(e)
 
         }
@@ -150,6 +151,7 @@ class BotaServer {
     }
 
     fun stopServer() {
+        isActive = false
         clients.values.forEach {
             try {
                 it.closeConnection()
@@ -164,8 +166,8 @@ class BotaServer {
             Log.d("BTU_SERVER_CLOSE", "Exception ${e.toString()}")
         } finally {
             _serverState.value = ServerState.Stopped
+            networkCallback.onServerStopped()
         }
-
     }
 
     fun denyConnection(ip: String) {
