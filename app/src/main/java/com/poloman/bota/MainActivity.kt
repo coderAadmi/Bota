@@ -452,10 +452,9 @@ class MainActivity : ComponentActivity() {
 
     fun startNetService() {
         Intent(applicationContext, NetworkService::class.java).also {
-            it.action = MonitorService.Action.START_MONITOR.toString()
             startForegroundService(it)
         }
-        bindService(Intent(this, NetworkService::class.java), netConnection, BIND_ABOVE_CLIENT)
+        bindService(Intent(this, NetworkService::class.java), netConnection, BIND_ALLOW_ACTIVITY_STARTS)
     }
 
     @RequiresApi(Build.VERSION_CODES.R)

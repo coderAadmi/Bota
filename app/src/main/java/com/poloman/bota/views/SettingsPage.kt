@@ -2,8 +2,10 @@ package com.poloman.bota.views
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -30,7 +32,9 @@ fun SettingsPage(communicator: Communicator) {
         OptionCard("See Connected Devices", painterResource(R.drawable.file)){
             communicator.showConnectedDevices()
         }
+        Spacer(Modifier.height(12.dp))
         OptionCard("Files are stored in internal files > BotaStorage folder",painterResource(R.drawable.file)) { }
+        OptionCard("Clicking Select Files to Transfer on Transfer page willclear previous selected files", painterResource(R.drawable.file)) { }
         OptionCard("Developed by Pradyumn Upadhyay", painterResource(R.drawable.file)) { }
     }
 }

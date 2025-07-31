@@ -75,7 +75,7 @@ class NetworkService : Service(), NetworkService.NetworkCallback {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("BTU_NET", "On Start called")
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     @RequiresApi(Build.VERSION_CODES.R)
@@ -318,6 +318,7 @@ class NetworkService : Service(), NetworkService.NetworkCallback {
     }
 
     override fun onClientDisconnected(ip :String, uname: String) {
+        if(!isAppInBackground)
         networkCallbackFromActivity?.onClientDisconnected(ip, uname)
     }
 
