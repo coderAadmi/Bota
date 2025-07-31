@@ -3,7 +3,7 @@ package com.poloman.bota.network
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
-import com.poloman.bota.BotaUser
+import com.poloman.bota.network.BotaUser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,19 +22,22 @@ class BotaServer {
         object Stopped : ServerState()
     }
 
+    lateinit var userName : String
     lateinit var networkCallback: NetworkService.NetworkCallback
 
     private lateinit var serverSocket: ServerSocket
     private var port = 0
     private val clients = mutableMapOf<String, BotaUser>()
+    private val yetToAcceptedClients = mutableListOf<BotaUser>()
 
     private var isActive = false
     private val _serverState = MutableStateFlow<ServerState>(ServerState.Stopped)
     val serverState: StateFlow<ServerState> = _serverState.asStateFlow()
 
     @RequiresApi(Build.VERSION_CODES.R)
-    constructor(port: Int, networkCallback: NetworkService.NetworkCallback) {
+    constructor(port: Int, name : String, networkCallback: NetworkService.NetworkCallback) {
         this.port = port
+        this.userName = name
         this.networkCallback = networkCallback
     }
 
@@ -50,6 +53,7 @@ class BotaServer {
             acceptClients()
         } catch (e: IOException) {
             Log.d("BTU_SERVER_INIT", "Exception ${e.toString()}")
+            networkCallback.onServerStarted()
             _serverState.value = ServerState.Error(e)
 
         }
@@ -58,15 +62,18 @@ class BotaServer {
     @RequiresApi(Build.VERSION_CODES.R)
     fun connectToHost(hostAddress: String, port: Int = 3443) {
         try {
-            val clientListener = BotaClient(hostAddress, port)
-            val clientCommander = BotaClient(hostAddress, port)
+            val clientListener = BotaClient(hostAddress, port, userName)
+            clientListener.onDisconnect = {
+                //clean memory
+                clients.remove(clientListener.getIpAddress())
+            }
+            val clientCommander = BotaClient(hostAddress, port, userName)
             clientListener.startListening(
                 onNameAsked = { hostName ->
                     if (clients.containsKey(clientCommander.getIpAddress())) {
                         //inform user already connected
                     } else {
-                        clients.put(
-                            clientCommander.getIpAddress(),
+
                             BotaUser(
                                 uname = hostName, ip = clientCommander.getIpAddress(),
                                 commander = clientCommander,
@@ -75,8 +82,10 @@ class BotaServer {
                                     Log.d("BTU_CLI_REMOVED", "Client $clientIp disconnected")
                                     clients.remove(clientIp)
                                 }
-                            ).setCallback(networkCallback)
-                        )
+                            ).setCallback(networkCallback).setConnectionAcceptedLambda { user ->
+                                clients.put(user.ip,user)
+                            }
+
                     }
                 }
             )
@@ -95,30 +104,38 @@ class BotaServer {
                 try {
                     Log.d("BTU_SERVER", "Waiting for client")
                     val client = serverSocket.accept()
-                    botaClientHost = BotaClient(client)
+                    botaClientHost = BotaClient(client, userName)
+                    botaClientHost.onDisconnect = {
+                        throw Exception("Client commander disconnected early")
+                    }
                     //ask for name and validate then connect the listening channel
-                    botaClientServer = BotaClient(serverSocket.accept())
-                    botaClientHost.sendCommand("UNAME Poloman-Android")
+                    botaClientServer = BotaClient(serverSocket.accept(), userName)
+                    botaClientServer.onDisconnect = {
+                        throw Exception("Client listener disconnected early")
+                    }
+                    botaClientHost.sendCommand("UNAME $userName")
                     val from = botaClientHost.recv() as Result.CommandResponse
-                    val uname = from.result.substringAfter("UNAME ")
-                    clients.put(
+                    val clientName = from.result.substringAfter("UNAME ")
+                    val botaUser = BotaUser(
+                        clientName,
                         botaClientHost.getIpAddress(),
-                        BotaUser(
-                            uname,
-                            botaClientHost.getIpAddress(),
-                            botaClientHost,
-                            botaClientServer,
-                            onDisconnected = {
+                        botaClientHost,
+                        botaClientServer,
+                        onDisconnected = {
                                 clientIp ->
-                                clients.remove(clientIp)
-                            }
-                        ).setCallback(networkCallback)
+                            clients.remove(clientIp)
+                        }
+                    ).setCallback(networkCallback)
+                    yetToAcceptedClients.add(botaUser)
+                    clients.put(
+                        botaUser.ip,
+                        botaUser
                     )
-                    networkCallback.onConnectionRequest(uname, botaClientHost.getIpAddress())
+                    networkCallback.onConnectionRequest(clientName, botaClientHost.getIpAddress())
                 } catch (e: Exception) {
                     Log.d("BTU_SERVER", "Exception ${e.toString()}")
                     botaClientHost?.closeConnection()
-//                    botaClientServer?.closeConnection()
+                    botaClientServer?.closeConnection()
                     _serverState.value = ServerState.Error(e)
                 }
             }
@@ -127,10 +144,14 @@ class BotaServer {
 
     @RequiresApi(Build.VERSION_CODES.R)
     fun startListeningFromClient(ip: String) {
-        clients.get(ip)?.startListening()
+        clients.get(ip)?.let { botaUser ->
+            yetToAcceptedClients.remove(botaUser)
+            botaUser.startListening()
+        }
     }
 
     fun stopServer() {
+        isActive = false
         clients.values.forEach {
             try {
                 it.closeConnection()
@@ -145,8 +166,8 @@ class BotaServer {
             Log.d("BTU_SERVER_CLOSE", "Exception ${e.toString()}")
         } finally {
             _serverState.value = ServerState.Stopped
+            networkCallback.onServerStopped()
         }
-
     }
 
     fun denyConnection(ip: String) {
@@ -173,7 +194,9 @@ class BotaServer {
     }
 
     fun getClients(): List<BotaUser> {
-        return clients.values.toList()
+        return clients.values.toList().filter { botaUser ->
+            !yetToAcceptedClients.contains(botaUser)
+        }
     }
 
     suspend fun receiveFileFrom(ip: String, fname: String, size :Long) {
@@ -186,7 +209,13 @@ class BotaServer {
 
     fun denyFile(ip : String){
         CoroutineScope(Dispatchers.IO).launch{
-            clients.get(ip)!!.denyFile(ip)
+            clients.get(ip)!!.denyFile()
+        }
+    }
+
+    fun updateUserName(name: String) {
+        clients.values.forEach {
+            it.updateUserName(name)
         }
     }
 

@@ -25,7 +25,7 @@ fun AppNavHost(
                 when (destination) {
                     Destination.HOME -> HomeScreen(communicator)
                     Destination.TRANSFER -> TransferScreen(communicator)
-                    Destination.SETTINGS -> SettingsScreen()
+                    Destination.SETTINGS -> SettingsScreen(communicator)
                 }
             }
         }

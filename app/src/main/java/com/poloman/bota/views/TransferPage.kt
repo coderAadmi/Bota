@@ -97,12 +97,13 @@ fun TransferPage(communicator: Communicator) {
             onClick = {
                 filePickerLauncher.launch("*/*")
             },
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFE8EDF5)),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding( horizontal = 12.dp)
                 .constrainAs(selectFilesBtn) {
                     centerHorizontallyTo(parent)
-                    top.linkTo(parent.top, margin = 12.dp)
+                    top.linkTo(parent.top, margin = 4.dp)
                 }){
             ConstraintLayout(Modifier.fillMaxWidth()) {
                 val (ic, tt) = createRefs()
@@ -116,7 +117,7 @@ fun TransferPage(communicator: Communicator) {
                     centerVerticallyTo(parent)
                     start.linkTo(ic.end, margin  = 8.dp)
                     end.linkTo(parent.end, margin = 12.dp)
-                })
+                }, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -139,7 +140,7 @@ fun TransferPage(communicator: Communicator) {
 
         Button(
             onClick = {
-                communicator.showConnectedDevices()
+                communicator.showUserSelector()
             },
             modifier = Modifier
                 .fillMaxWidth()

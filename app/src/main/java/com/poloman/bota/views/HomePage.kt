@@ -15,14 +15,17 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import androidx.core.content.ContextCompat
@@ -30,6 +33,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.rememberImagePainter
 import com.poloman.bota.QrViewModel
 import com.poloman.bota.network.Communicator
+import com.poloman.bota.network.Helper
 import io.github.g00fy2.quickie.QRResult
 import io.github.g00fy2.quickie.ScanQRCode
 
@@ -70,25 +74,18 @@ fun HomePage(communicator: Communicator) {
             .padding(bottom = 1.dp)
             .background(Color(0xFFF7FAFC))
     ) {
-        val (title, strategy, genQR, scanQR, qrImg, permissionCard) = createRefs()
+        val ( strategy, genQR, scanQR, qrImg, ipRef) = createRefs()
         val context = LocalContext.current
 
-
-        Text(
-            "Bota",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp,
-            modifier = Modifier.constrainAs(title) {
-                top.linkTo(parent.top, margin = 24.dp)
-                centerHorizontallyTo(parent)
-            })
+        var serverBtnText by rememberSaveable { mutableStateOf("Start Server") }
+        var serverBtnColor by remember { mutableStateOf(Color(0xFF0A80ED)) }
 
         Text(
             "Choose how you want to connect to other devices on your local network",
             modifier = Modifier
                 .padding(horizontal = 20.dp)
                 .constrainAs(strategy) {
-                    top.linkTo(title.bottom, margin = 12.dp)
+                    top.linkTo(parent.top, margin = 12.dp)
                     centerHorizontallyTo(parent)
                 })
 
@@ -97,7 +94,7 @@ fun HomePage(communicator: Communicator) {
                 communicator.onStartServer()
             },
             colors = ButtonDefaults
-                .buttonColors(containerColor = Color(0xFF0A80ED)), modifier = Modifier
+                .buttonColors(containerColor = serverBtnColor), modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp)
                 .constrainAs(genQR) {
@@ -105,7 +102,7 @@ fun HomePage(communicator: Communicator) {
                     centerHorizontallyTo(parent)
                 }) {
 
-            Text("Generate QR", fontWeight = FontWeight.Bold)
+            Text(serverBtnText, fontWeight = FontWeight.Bold)
         }
 
         Button(
@@ -137,7 +134,10 @@ fun HomePage(communicator: Communicator) {
             )
         }
 
+
         qrVm.getQrCodeState().collectAsState().value?.let {
+            serverBtnText = "Stop Server"
+            serverBtnColor = Color.Black
             Image(
                 painter = rememberImagePainter(it),
                 contentDescription = "",
@@ -150,7 +150,16 @@ fun HomePage(communicator: Communicator) {
                         width = Dimension.fillToConstraints
                         height = Dimension.fillToConstraints
 
-                    })
+                    }
+            )
+
+            Text(text = Helper.getdeviceIpAddress(), modifier = Modifier.constrainAs(ipRef) {
+                top.linkTo(qrImg.bottom, margin = 16.dp)
+                centerHorizontallyTo(parent)
+            }, color = Color.Black, fontWeight = FontWeight.Bold)
+        }?:run {
+            serverBtnText = "Start Server"
+            serverBtnColor = Color(0xFF0A80ED)
         }
 
     }

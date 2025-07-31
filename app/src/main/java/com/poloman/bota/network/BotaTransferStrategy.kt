@@ -4,18 +4,38 @@ import android.os.Build
 import android.os.Environment
 import android.util.Log
 import androidx.annotation.RequiresApi
+import com.poloman.bota.network.BotaUser
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import java.net.SocketException
 import java.nio.ByteBuffer
 
 class BotaTransferStrategy : SendStrategy {
 
+    private var incomingFileSize = 0L
+    private var outGoingFileSize = 0L
+    private var totalSentSize = 0L
+    private var totalReadSize = 0L
+    private lateinit var clientCallback: BotaClientCallback
+    private var lastSendProgress = 0
+    private var lastReceiveProgress = 0
+
     @RequiresApi(Build.VERSION_CODES.R)
     val root = "${Environment.getExternalStorageDirectory().path}${File.separator}BotaStorage${File.separator}"
+
+    fun setFileIncomingSize(incomSize : Long){
+        incomingFileSize = incomSize
+        totalReadSize = 0L
+        lastReceiveProgress = 0
+    }
+
+    fun setCallback(callback : BotaClientCallback){
+        clientCallback = callback
+    }
 
     override fun sendFile(
         file: File,
@@ -24,6 +44,8 @@ class BotaTransferStrategy : SendStrategy {
     ): Result {
         val ftSize = 2048
         val filePath = "${file.name}"
+        try
+        {
         sendCommand("RCV_FILE $filePath",bos,bis)
         var reply = recvCommand(bos,bis) as Result.CommandResponse
         if(reply.result.equals("SND_SIZE")){
@@ -33,7 +55,6 @@ class BotaTransferStrategy : SendStrategy {
 
 
         if(reply.result.equals("SND_FILE $filePath")){
-            try {
 
                 val fis = FileInputStream(file)
                 var byteArray = ByteArray(ftSize)
@@ -43,7 +64,13 @@ class BotaTransferStrategy : SendStrategy {
                 while (readBytes > 0){
                     bos.write(byteArray,0,readBytes)
                     bytesSent += readBytes
-                    Log.d("BTU_BYTES_SENT","Bytes Sent $readBytes  Total : $bytesSent" )
+//                    Log.d("BTU_BYTES_SENT","Bytes Sent $readBytes  Total : $bytesSent" )
+                    totalSentSize += readBytes
+                    val newProgress = (100*(totalSentSize.toFloat() / outGoingFileSize)).toInt()
+                    if(newProgress > lastSendProgress){
+                        clientCallback.onOutgoingProgressChange(newProgress)
+                        lastSendProgress = newProgress
+                    }
                     readBytes = fis.read(byteArray,0,ftSize)
                 }
                 bos.flush()
@@ -51,11 +78,12 @@ class BotaTransferStrategy : SendStrategy {
                 Log.d("BTU_FILE_SENT","SENT ${file.name} bytes sent = $bytesSent")
 
             }
-            catch (e : IOException){
-                // clear the bos, send something so that receiver reads -1 bytes
-                Log.d("BTU_IO_ERROR",e.toString())
-                return Result.Error(e)
-            }
+        }
+        catch (e : Exception){
+            // clear the bos, send something so that receiver reads -1 bytes
+            Log.d("BTU_IO_ERROR",e.toString())
+            clientCallback.onClientDisconnected()
+            return Result.Error(e)
         }
         return Result.Success
     }
@@ -65,14 +93,19 @@ class BotaTransferStrategy : SendStrategy {
         bos: BufferedOutputStream,
         bis: BufferedInputStream
     ): Result {
-        val cmdLen = cmd.toByteArray().size
-        val byteBuf = ByteBuffer.allocate(Int.SIZE_BYTES)
-        byteBuf.putInt(cmdLen)
-        bos.write(byteBuf.array())
-        bos.write(cmd.toByteArray())
-        bos.flush()
-        Log.d("BTU_CMD","SENT : $cmd")
-        return Result.Success
+        try {
+            val cmdLen = cmd.toByteArray().size
+            val byteBuf = ByteBuffer.allocate(Int.SIZE_BYTES)
+            byteBuf.putInt(cmdLen)
+            bos.write(byteBuf.array())
+            bos.write(cmd.toByteArray())
+            bos.flush()
+            Log.d("BTU_CMD","SENT : $cmd")
+            return Result.Success
+        } catch (e: SocketException) {
+            clientCallback.onClientDisconnected()
+            return Result.Error(e)
+        }
     }
 
     override fun sendDir(
@@ -98,7 +131,9 @@ class BotaTransferStrategy : SendStrategy {
             try {
                 file.parentFile.mkdirs()
             }
-            catch (e: Exception) {}
+            catch (e: Exception) {
+
+            }
             file.createNewFile()
             val fos = FileOutputStream(file)
 
@@ -110,12 +145,20 @@ class BotaTransferStrategy : SendStrategy {
                     break
                 fos.write(byteArray, 0, readBytes)
                 totalBytesRead += readBytes
-                Log.d("BTU_RCV_FILE","readBytes $readBytes  Total : $totalBytesRead")
+                totalReadSize += readBytes
+                val newProgress = (100 * (totalReadSize.toFloat() / incomingFileSize)).toInt()
+                if(newProgress > lastReceiveProgress){
+                    clientCallback.onIncomingProgressChange( newProgress )
+                    lastReceiveProgress = newProgress
+                }
             }
             fos.flush()
             fos.close()
             if (totalBytesRead == size){
                 Log.d("BTU_FILE_RECVD","RECVD $fileName")
+                if(totalReadSize == incomingFileSize){
+                    clientCallback.onAllFilesReceived()
+                }
                 return Result.Success
             }
         } catch (e: Exception) {
@@ -131,20 +174,25 @@ class BotaTransferStrategy : SendStrategy {
         bis: BufferedInputStream
     ): Result {
 
-        val lenBuf = ByteArray(4)
-        bis.readFully(lenBuf) // read 4 bytes completely
-        val cmdLen = ByteBuffer.wrap(lenBuf).int
+        try {
+            val lenBuf = ByteArray(4)
+            bis.readFully(lenBuf) // read 4 bytes completely
+            val cmdLen = ByteBuffer.wrap(lenBuf).int
 
-        val MAX_CMD_LEN = 8192
-        if (cmdLen <= 0 || cmdLen > MAX_CMD_LEN) {
-            throw IOException("Invalid command length: $cmdLen")
+            val MAX_CMD_LEN = 8192
+            if (cmdLen <= 0 || cmdLen > MAX_CMD_LEN) {
+                throw IOException("Invalid command length: $cmdLen")
+            }
+
+            val cmdBytes = ByteArray(cmdLen)
+            bis.readFully(cmdBytes)
+
+            val cmd = String(cmdBytes)
+            return Result.CommandResponse(cmd)
+        } catch (e: SocketException) {
+            clientCallback.onClientDisconnected()
+            return Result.Error(e)
         }
-
-        val cmdBytes = ByteArray(cmdLen)
-        bis.readFully(cmdBytes)
-
-        val cmd = String(cmdBytes)
-        return Result.CommandResponse(cmd)
     }
 
     fun BufferedInputStream.readFully(buf: ByteArray, offset: Int = 0, length: Int = buf.size) {
@@ -176,15 +224,28 @@ class BotaTransferStrategy : SendStrategy {
         }
         sendCommand("MULTIPLE_FILE_INCOMING_PERMISSION ${files.size}", bos ,bis)
         sendCommand("FILE_SIZE ${totalFilesSize}",bos, bis)
-        val reply = recvCommand(bos,bis) as Result.CommandResponse
+        clientCallback.onWaitingForPermissionToSend()
+        val tempRep = recvCommand(bos,bis)
+        if(tempRep is Result.Error){
+            return
+        }
+        val reply = tempRep as Result.CommandResponse
 
         if(reply.result.equals("OK $totalFilesSize")){
+            clientCallback.onRequestAccepted()
+            outGoingFileSize = totalFilesSize
+            totalSentSize = 0L
+            lastSendProgress = 0
             files.forEach {
                 sendFile(it, bos, bis)
+            }
+            if(totalSentSize == outGoingFileSize){
+                clientCallback.onAllFilesSent()
             }
         }
         else{
             //denied
+            clientCallback.onRequestDenied()
         }
     }
 }

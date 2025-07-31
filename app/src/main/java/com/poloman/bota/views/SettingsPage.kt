@@ -2,8 +2,10 @@ package com.poloman.bota.views
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -16,29 +18,33 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import com.poloman.bota.R
+import com.poloman.bota.network.Communicator
 
-@Preview(showSystemUi = true)
 @Composable
-fun SettingsPage() {
+fun SettingsPage(communicator: Communicator) {
     Column(modifier = Modifier
         .fillMaxSize()
         .background(Color(0xFFF7FAFC))) {
-        OptionCard("Connected Devices", painterResource(R.drawable.file)){}
-        OptionCard("Help",painterResource(R.drawable.file)) { }
-        OptionCard("FAQ", painterResource(R.drawable.file)) { }
-        OptionCard("About", painterResource(R.drawable.file)) { }
+        OptionCard("See Connected Devices", painterResource(R.drawable.file)){
+            communicator.showConnectedDevices()
+        }
+        Spacer(Modifier.height(12.dp))
+        OptionCard("Files are stored in internal files > BotaStorage folder",painterResource(R.drawable.file)) { }
+        OptionCard("Clicking Select Files to Transfer on Transfer page willclear previous selected files", painterResource(R.drawable.file)) { }
+        OptionCard("Developed by Pradyumn Upadhyay", painterResource(R.drawable.file)) { }
     }
 }
 
 
 @Composable
 fun OptionCard(title: String, painter : Painter, actionClick: () -> Unit) {
-    Card(modifier = Modifier
+    Card(
+        onClick = actionClick,
+        modifier = Modifier
         .fillMaxWidth()
         .padding(4.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFF7FAFC)),
@@ -46,7 +52,6 @@ fun OptionCard(title: String, painter : Painter, actionClick: () -> Unit) {
         ConstraintLayout(modifier = Modifier.fillMaxWidth()) {
             val (icon, text, next) = createRefs()
             Card(
-                onClick = actionClick,
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFE8EDF5)),
                 elevation = CardDefaults.cardElevation(0.dp),
                 modifier = Modifier.constrainAs(icon) {

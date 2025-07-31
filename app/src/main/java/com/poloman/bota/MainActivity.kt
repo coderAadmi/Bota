@@ -11,6 +11,7 @@ import android.os.Environment
 import android.os.IBinder
 import android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -28,26 +29,34 @@ import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.navigation.compose.rememberNavController
+import com.poloman.bota.network.BotaServer
 import com.poloman.bota.network.Communicator
 import com.poloman.bota.network.NetworkResponse
 import com.poloman.bota.network.NetworkService
+import com.poloman.bota.network.TransferProgress
 import com.poloman.bota.screen.AppNavHost
 import com.poloman.bota.screen.Destination
-import com.poloman.bota.screen.PermissionDialog
+import com.poloman.bota.views.PermissionDialog
 import com.poloman.bota.service.MonitorService
 import com.poloman.bota.service.OnFileDiscovered
 import com.poloman.bota.ui.theme.BotaTheme
+import com.poloman.bota.views.BotaAppBar
 import com.poloman.bota.views.ConnectedUsersDialog
+import com.poloman.bota.views.ProgressDialog
+import com.poloman.bota.views.UserSelectorDialog
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.io.File
 
 @AndroidEntryPoint
@@ -57,11 +66,12 @@ class MainActivity : ComponentActivity() {
     val requestSettingLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
             if (Environment.isExternalStorageManager()) {
-                Log.d("PER_SET", Environment.getRootDirectory().path)
-                monitor()
+                networkService?.initServer()
             } else {
                 //show user error
                 Log.d("PER_SET", "Setting not granted")
+                Toast.makeText(this,"Can not perform data transfer without storage access",
+                    Toast.LENGTH_SHORT).show()
             }
 
         }
@@ -110,9 +120,9 @@ class MainActivity : ComponentActivity() {
             Log.d("BTU_BND", "Net Service bound")
 
             networkService?.let { service ->
-                service.networkCallback = object : NetworkService.NetworkCallback {
+                service.networkCallbackFromActivity = object : NetworkService.NetworkCallback {
                     override fun onConnectionRequest(from: String, ip: String) {
-                        vm.setNetworkServiceState(NetworkResponse.ConnectionRequest(from, ip))
+                        vm.setNetworkReqState(NetworkResponse.ConnectionRequest(from, ip))
                     }
 
                     override fun onDataIncomingRequest(
@@ -137,7 +147,7 @@ class MainActivity : ComponentActivity() {
                         fileCount: Int,
                         size: Long
                     ) {
-                        vm.setNetworkServiceState(
+                        vm.setNetworkReqState(
                             NetworkResponse.IncomingMulDataRequest(
                                 from,
                                 ip,
@@ -145,32 +155,84 @@ class MainActivity : ComponentActivity() {
                                 size
                             )
                         )
+
                     }
 
                     override fun onServerStarted() {
                         vm.generateQrCode()
                     }
+
+                    override fun onServerStopped() {
+                        vm.serverStopped()
+                    }
+
+                    override fun onIncomingProgressChange(ip: String, progress: TransferProgress) {
+                        Log.d("BOTA_IN_PROGRESS","From $ip progress $progress %")
+                        vm.setProgressState("FROM $ip", progress)
+                    }
+
+                    override fun onOutgoingProgressChange(ip: String, progress: TransferProgress) {
+                        Log.d("BOTA_OUT_PROGRESS","To $ip progress $progress %")
+                        vm.setProgressState("TO $ip", progress)
+                    }
+
+                    override fun onStatusChange(
+                        ip: String,
+                        progress: TransferProgress
+                    ) {
+                        when(progress){
+                            is TransferProgress.CalculatingSize -> {
+                                vm.showProgressDialog()
+                                vm.setProgressState("TO $ip", progress)
+                            }
+                            is TransferProgress.RequestDenied -> {
+                                vm.setProgressState("TO $ip", progress)
+                            }
+                            is TransferProgress.Success -> {
+                                if(progress.isReceiving){
+                                    vm.setProgressState("FROM $ip", progress)
+                                }
+                                else{
+                                    vm.setProgressState("TO $ip", progress)
+                                }
+                            }
+                            is TransferProgress.Transmitted -> {
+                            }
+                            is TransferProgress.WaitingForPermissionToSend -> {
+                                vm.setProgressState("TO $ip", progress)
+                            }
+                            is TransferProgress.WaitingForSender -> {
+                                vm.setProgressState("FROM $ip", progress)
+                            }
+                        }
+                    }
+
+                    override fun onClientDisconnected(ip: String, uname : String) {
+                        vm.removeUpdatesFor(ip)
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity,"$uname disconnected", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 }
             }
 
-            monitorService?.let { service ->
-                service.setOnFileDiscoveredCallback(object : OnFileDiscovered {
-                    override fun onDirDiscovered(dirName: String) {
-//                        networkService?.let { it.sendDir(dirName) }
-                    }
+            monitorService?.setOnFileDiscoveredCallback(object : OnFileDiscovered {
+                override fun onDirDiscovered(dirName: String) {
+        //                        networkService?.let { it.sendDir(dirName) }
+                }
 
-                    override fun onFileDiscovered(file: File) {
-                        if (file.exists()) {
-//                            networkService?.let { it.sendFile(file) }
-                        }
+                override fun onFileDiscovered(file: File) {
+                    if (file.exists()) {
+        //                            networkService?.let { it.sendFile(file) }
                     }
-                })
-            }
+                }
+            })
 
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             networkService = null
+
             Log.d("BTU_BND", "Network Service Unbound")
         }
 
@@ -179,20 +241,30 @@ class MainActivity : ComponentActivity() {
     val connector = object : Communicator {
         @RequiresApi(Build.VERSION_CODES.R)
         override fun onStartServer() {
-            networkService?.let {
-                it.initServer()
+            if(networkService?.getServerState()!!.value == BotaServer.ServerState.Running){
+                networkService?.stopServer()
             }
+            else
+            checkStoragePermissions()
         }
 
         override fun onConnectToServer(ip: String) {
-            networkService?.let {
-                it.connectToServer(ip)
-            }
+            networkService?.connectToServer(ip)
 
         }
 
+        override fun showUserSelector() {
+            if(vm.getSelectedFiles().value.isEmpty()){
+                Toast.makeText(this@MainActivity,"Select some files to transfer",
+                    Toast.LENGTH_SHORT).show()
+            }
+            else {
+                vm.showUserSelector()
+            }
+        }
+
         override fun showConnectedDevices() {
-            vm.showUserSelector()
+            vm.showConnectedDevs(true)
         }
 
     }
@@ -239,21 +311,36 @@ class MainActivity : ComponentActivity() {
                     }
                 ) { innerPadding ->
 
-
-                    Column(modifier = Modifier.padding(innerPadding)) {
+                    Column(modifier = Modifier.padding(innerPadding))
+                    {
                         when (vm.userSelectorState.collectAsState().value) {
                             true -> {
                                 networkService?.let {
-                                    ConnectedUsersDialog(it.getConnectedUsers(), onDismiss = {
+                                    UserSelectorDialog (it.getConnectedUsers(), onDismiss = {
                                         vm.hideUserSelector()
                                     })
                                     { selectedUsers ->
-                                        selectedUsers.forEach { user ->
-                                            Log.d("BOTA_USER_LIST", "${user.uname} : ${user.ip}")
+                                        if(selectedUsers.isEmpty()) {
+                                            Toast.makeText(this@MainActivity,"Please select a user to send the files",
+                                                Toast.LENGTH_SHORT).show()
+                                        }
+                                        else{
+                                            vm.hideUserSelector()
+                                            vm.showProgressDialog()
+                                            selectedUsers.forEach { user ->
+                                                Log.d(
+                                                    "BOTA_USER_LIST",
+                                                    "${user.uname} : ${user.ip}"
+                                                )
+                                                vm.setProgressState(
+                                                    "TO ${user.ip}",
+                                                    TransferProgress.CalculatingSize(user.uname)
+                                                )
                                                 networkService?.sendFiles(
                                                     user.ip,
                                                     vm.getSelectedFiles().value
                                                 )
+                                            }
                                         }
                                     }
                                 }
@@ -264,32 +351,65 @@ class MainActivity : ComponentActivity() {
                         }
                         PermissionDialog(
                             modifier = Modifier,
-                            vm.getNetworkResponseState(),
-                            onAccept = { ip: String ->
+                            vm.getPermissionDialogState(),
+                            vm.getNetworkReqState(),
+                            onAccept = { ip: String, req : NetworkResponse ->
                                 networkService?.acceptConnection(ip)
-                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+//                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                                vm.removeNetworkReqState(req)
                             },
-                            onDeny = { ip: String ->
+                            onDeny = { ip: String, req : NetworkResponse ->
                                 networkService?.denyConnection(ip)
-                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+//                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                                vm.removeNetworkReqState(req)
                             },
 
-                            onFileAccept = { ip: String, fname: String, size: Long ->
+                            onFileAccept = { ip: String, fname: String, size: Long, req : NetworkResponse ->
                                 networkService?.acceptFile(ip, fileName = fname, size = size)
-                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+//                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                                vm.removeNetworkReqState(req)
                             },
 
-                            onMulFilesAccept = { ip: String, fcount: Int, size: Long ->
+                            onMulFilesAccept = { ip: String, fcount: Int, size: Long, req : NetworkResponse ->
                                 networkService?.acceptFile(ip, fcount, size)
-                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+//                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                                vm.removeNetworkReqState(req)
                             },
 
-                            onFileDeny = { ip: String ->
+                            onFileDeny = { ip: String, req : NetworkResponse ->
                                 networkService?.denyFile(ip)
-                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+//                                vm.setNetworkServiceState(NetworkResponse.Nothing)
+                                vm.removeNetworkReqState(req)
                             }
 
+                        ){
+                            // on Dismiss
+                            vm.hidePermissionDialog()
+                        }
+
+                        ProgressDialog(vm.getProgressDialogState(),vm.getProgressState()){
+                            vm.hideProgressDialog()
+                        }
+
+                        when(vm.getConnectedDevShownState().collectAsState().value){
+                            true -> {
+                                networkService?.let {
+                                    ConnectedUsersDialog(it.getConnectedUsers()) {
+                                        vm.showConnectedDevs(false)
+                                    }
+                                }
+                            }
+                            false -> {
+
+                            }
+                        }
+
+                        BotaAppBar(selectedDestination, vm.getProgressState(), vm.getProgressDialogState(),
+                            vm.getPermissionDialogState(), vm.getNetworkReqState(),
+                            { vm.showProgressDialog() }, { vm.showPermissionDialog()}
                         )
+
+
                         AppNavHost(
                             navController,
                             startDestination,
@@ -301,7 +421,7 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        startMonitorService()
+//        startMonitorService()
         startNetService()
 
     }
@@ -332,17 +452,27 @@ class MainActivity : ComponentActivity() {
 
     fun startNetService() {
         Intent(applicationContext, NetworkService::class.java).also {
-            it.action = MonitorService.Action.START_MONITOR.toString()
             startForegroundService(it)
         }
-        bindService(Intent(this, NetworkService::class.java), netConnection, BIND_ABOVE_CLIENT)
+        bindService(Intent(this, NetworkService::class.java), netConnection, BIND_ALLOW_ACTIVITY_STARTS)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.R)
+    fun checkStoragePermissions(){
+        if (!Environment.isExternalStorageManager()) {
+            Toast.makeText(this,"Storage access is required to write files to memory",
+                Toast.LENGTH_SHORT).show()
+            requestSettingLauncher.launch(Intent(ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+        } else {
+            Log.d("PER_SET", Environment.getRootDirectory().path)
+            networkService?.initServer()
+        }
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         try {
             if (netConnection != null) {
-                unbindService(netConnection)
+                networkService?.stopSelf()
             }
             if (connection != null) {
                 unbindService(connection)
@@ -352,5 +482,19 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
 
         }
+        finally {
+            super.onDestroy()
+        }
     }
+
+    override fun onStop() {
+        networkService?.isAppInBackground = true
+        super.onStop()
+    }
+
+    override fun onResume() {
+        networkService?.isAppInBackground = false
+        super.onResume()
+    }
+
 }
