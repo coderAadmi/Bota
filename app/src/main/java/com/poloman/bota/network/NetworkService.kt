@@ -43,6 +43,7 @@ class NetworkService : Service(), NetworkService.NetworkCallback {
         fun onIncomingProgressChange(ip: String, progress: TransferProgress)
         fun onOutgoingProgressChange(ip: String, progress: TransferProgress)
         fun onStatusChange(ip: String, progress: TransferProgress)
+        fun onClientDisconnected(ip: String, uname : String)
     }
 
     var serverName = "${Build.BRAND} ${Build.MODEL} ${Build.USER}"
@@ -308,6 +309,10 @@ class NetworkService : Service(), NetworkService.NetworkCallback {
         progress: TransferProgress
     ) {
         networkCallbackFromActivity?.onStatusChange(ip, progress)
+    }
+
+    override fun onClientDisconnected(ip :String, uname: String) {
+        networkCallbackFromActivity?.onClientDisconnected(ip, uname)
     }
 
     fun stopServer() {

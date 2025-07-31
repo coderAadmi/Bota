@@ -65,6 +65,10 @@ class BotaUser {
             networkCallback.onStatusChange(ip, TransferProgress.Success(uname, true))
         }
 
+        override fun onClientDisconnected() {
+            this@BotaUser.commander.onDisconnect()
+        }
+
     }
 
 
@@ -74,9 +78,11 @@ class BotaUser {
         this.uname = uname
         this.ip = ip
         this.commander.onDisconnect = {
+            networkCallback?.onClientDisconnected(ip,uname)
             onDisconnected(this.ip)
         }
         this.listener.onDisconnect = {
+            networkCallback?.onClientDisconnected(ip, uname)
             onDisconnected(this.ip)
         }
     }

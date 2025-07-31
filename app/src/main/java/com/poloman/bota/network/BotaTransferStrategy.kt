@@ -11,6 +11,7 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import java.net.SocketException
 import java.nio.ByteBuffer
 
 class BotaTransferStrategy : SendStrategy {
@@ -43,6 +44,8 @@ class BotaTransferStrategy : SendStrategy {
     ): Result {
         val ftSize = 2048
         val filePath = "${file.name}"
+        try
+        {
         sendCommand("RCV_FILE $filePath",bos,bis)
         var reply = recvCommand(bos,bis) as Result.CommandResponse
         if(reply.result.equals("SND_SIZE")){
@@ -52,7 +55,6 @@ class BotaTransferStrategy : SendStrategy {
 
 
         if(reply.result.equals("SND_FILE $filePath")){
-            try {
 
                 val fis = FileInputStream(file)
                 var byteArray = ByteArray(ftSize)
@@ -76,11 +78,12 @@ class BotaTransferStrategy : SendStrategy {
                 Log.d("BTU_FILE_SENT","SENT ${file.name} bytes sent = $bytesSent")
 
             }
-            catch (e : IOException){
-                // clear the bos, send something so that receiver reads -1 bytes
-                Log.d("BTU_IO_ERROR",e.toString())
-                return Result.Error(e)
-            }
+        }
+        catch (e : Exception){
+            // clear the bos, send something so that receiver reads -1 bytes
+            Log.d("BTU_IO_ERROR",e.toString())
+            clientCallback.onClientDisconnected()
+            return Result.Error(e)
         }
         return Result.Success
     }
@@ -90,14 +93,19 @@ class BotaTransferStrategy : SendStrategy {
         bos: BufferedOutputStream,
         bis: BufferedInputStream
     ): Result {
-        val cmdLen = cmd.toByteArray().size
-        val byteBuf = ByteBuffer.allocate(Int.SIZE_BYTES)
-        byteBuf.putInt(cmdLen)
-        bos.write(byteBuf.array())
-        bos.write(cmd.toByteArray())
-        bos.flush()
-        Log.d("BTU_CMD","SENT : $cmd")
-        return Result.Success
+        try {
+            val cmdLen = cmd.toByteArray().size
+            val byteBuf = ByteBuffer.allocate(Int.SIZE_BYTES)
+            byteBuf.putInt(cmdLen)
+            bos.write(byteBuf.array())
+            bos.write(cmd.toByteArray())
+            bos.flush()
+            Log.d("BTU_CMD","SENT : $cmd")
+            return Result.Success
+        } catch (e: SocketException) {
+            clientCallback.onClientDisconnected()
+            return Result.Error(e)
+        }
     }
 
     override fun sendDir(
@@ -166,20 +174,25 @@ class BotaTransferStrategy : SendStrategy {
         bis: BufferedInputStream
     ): Result {
 
-        val lenBuf = ByteArray(4)
-        bis.readFully(lenBuf) // read 4 bytes completely
-        val cmdLen = ByteBuffer.wrap(lenBuf).int
+        try {
+            val lenBuf = ByteArray(4)
+            bis.readFully(lenBuf) // read 4 bytes completely
+            val cmdLen = ByteBuffer.wrap(lenBuf).int
 
-        val MAX_CMD_LEN = 8192
-        if (cmdLen <= 0 || cmdLen > MAX_CMD_LEN) {
-            throw IOException("Invalid command length: $cmdLen")
+            val MAX_CMD_LEN = 8192
+            if (cmdLen <= 0 || cmdLen > MAX_CMD_LEN) {
+                throw IOException("Invalid command length: $cmdLen")
+            }
+
+            val cmdBytes = ByteArray(cmdLen)
+            bis.readFully(cmdBytes)
+
+            val cmd = String(cmdBytes)
+            return Result.CommandResponse(cmd)
+        } catch (e: SocketException) {
+            clientCallback.onClientDisconnected()
+            return Result.Error(e)
         }
-
-        val cmdBytes = ByteArray(cmdLen)
-        bis.readFully(cmdBytes)
-
-        val cmd = String(cmdBytes)
-        return Result.CommandResponse(cmd)
     }
 
     fun BufferedInputStream.readFully(buf: ByteArray, offset: Int = 0, length: Int = buf.size) {
@@ -212,7 +225,11 @@ class BotaTransferStrategy : SendStrategy {
         sendCommand("MULTIPLE_FILE_INCOMING_PERMISSION ${files.size}", bos ,bis)
         sendCommand("FILE_SIZE ${totalFilesSize}",bos, bis)
         clientCallback.onWaitingForPermissionToSend()
-        val reply = recvCommand(bos,bis) as Result.CommandResponse
+        val tempRep = recvCommand(bos,bis)
+        if(tempRep is Result.Error){
+            return
+        }
+        val reply = tempRep as Result.CommandResponse
 
         if(reply.result.equals("OK $totalFilesSize")){
             clientCallback.onRequestAccepted()

@@ -12,4 +12,5 @@ interface BotaClientCallback{
         fun onRequestDenied() // client denied the request
         fun onAllFilesSent()
         fun onAllFilesReceived()
+        fun onClientDisconnected()
     }

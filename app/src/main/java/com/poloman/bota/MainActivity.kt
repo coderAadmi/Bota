@@ -204,6 +204,13 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
+
+                    override fun onClientDisconnected(ip: String, uname : String) {
+                        vm.removeUpdatesFor(ip)
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity,"$uname disconnected", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 }
             }
 

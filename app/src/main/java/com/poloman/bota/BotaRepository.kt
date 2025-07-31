@@ -163,4 +163,25 @@ class BotaRepository @Inject constructor(private val appContext : Context,
         _qrCodeDrawable.value = null
     }
 
+    fun removeUpdatesFor(ip: String) {
+        val map = _progressState.value.toMutableMap()
+        if(map.contains("FROM $ip")){
+            map.remove("FROM $ip")
+        }
+        if(map.contains("TO $ip")){
+            map.remove("TO $ip")
+        }
+        _progressState.value = map
+
+        val list = _networkRequestsState.value.toMutableList()
+        list.filter { nr ->
+            if((nr is NetworkResponse.ConnectionRequest && nr.ip.equals(ip)) ||
+                nr is NetworkResponse.IncomingMulDataRequest && nr.ip.equals(ip)){
+                 false
+            }
+            true
+        }
+        _networkRequestsState.value = list
+    }
+
 }

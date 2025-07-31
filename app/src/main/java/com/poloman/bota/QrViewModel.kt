@@ -101,4 +101,8 @@ class QrViewModel @Inject constructor(private val repository: BotaRepository) : 
     fun serverStopped() {
         repository.severStopped()
     }
+
+    fun removeUpdatesFor(ip: String) {
+        repository.removeUpdatesFor(ip)
+    }
 }
