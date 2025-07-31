@@ -1,12 +1,8 @@
-package com.poloman.bota
+package com.poloman.bota.network
 
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
-import com.poloman.bota.network.BotaClient
-import com.poloman.bota.network.BotaClientCallback
-import com.poloman.bota.network.NetworkService
-import com.poloman.bota.network.TransferProgress
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

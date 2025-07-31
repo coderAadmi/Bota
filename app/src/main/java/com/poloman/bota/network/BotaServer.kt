@@ -3,7 +3,7 @@ package com.poloman.bota.network
 import android.os.Build
 import android.util.Log
 import androidx.annotation.RequiresApi
-import com.poloman.bota.BotaUser
+import com.poloman.bota.network.BotaUser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow

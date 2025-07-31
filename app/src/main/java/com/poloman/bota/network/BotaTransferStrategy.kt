@@ -4,7 +4,7 @@ import android.os.Build
 import android.os.Environment
 import android.util.Log
 import androidx.annotation.RequiresApi
-import com.poloman.bota.BotaUser
+import com.poloman.bota.network.BotaUser
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.File

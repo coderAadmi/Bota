@@ -20,7 +20,7 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
-import com.poloman.bota.BotaUser
+import com.poloman.bota.network.BotaUser
 import com.poloman.bota.MainActivity
 import com.poloman.bota.R
 import kotlinx.coroutines.CoroutineScope
