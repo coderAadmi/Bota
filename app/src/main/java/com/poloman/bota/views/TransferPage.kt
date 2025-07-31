@@ -140,7 +140,7 @@ fun TransferPage(communicator: Communicator) {
 
         Button(
             onClick = {
-                communicator.showConnectedDevices()
+                communicator.showUserSelector()
             },
             modifier = Modifier
                 .fillMaxWidth()

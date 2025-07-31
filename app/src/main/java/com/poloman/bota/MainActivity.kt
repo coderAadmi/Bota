@@ -33,6 +33,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -51,6 +52,7 @@ import com.poloman.bota.ui.theme.BotaTheme
 import com.poloman.bota.views.BotaAppBar
 import com.poloman.bota.views.ConnectedUsersDialog
 import com.poloman.bota.views.ProgressDialog
+import com.poloman.bota.views.UserSelectorDialog
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -251,7 +253,7 @@ class MainActivity : ComponentActivity() {
 
         }
 
-        override fun showConnectedDevices() {
+        override fun showUserSelector() {
             if(vm.getSelectedFiles().value.isEmpty()){
                 Toast.makeText(this@MainActivity,"Select some files to transfer",
                     Toast.LENGTH_SHORT).show()
@@ -259,6 +261,10 @@ class MainActivity : ComponentActivity() {
             else {
                 vm.showUserSelector()
             }
+        }
+
+        override fun showConnectedDevices() {
+            vm.showConnectedDevs(true)
         }
 
     }
@@ -310,7 +316,7 @@ class MainActivity : ComponentActivity() {
                         when (vm.userSelectorState.collectAsState().value) {
                             true -> {
                                 networkService?.let {
-                                    ConnectedUsersDialog(it.getConnectedUsers(), onDismiss = {
+                                    UserSelectorDialog (it.getConnectedUsers(), onDismiss = {
                                         vm.hideUserSelector()
                                     })
                                     { selectedUsers ->
@@ -383,6 +389,19 @@ class MainActivity : ComponentActivity() {
 
                         ProgressDialog(vm.getProgressDialogState(),vm.getProgressState()){
                             vm.hideProgressDialog()
+                        }
+
+                        when(vm.getConnectedDevShownState().collectAsState().value){
+                            true -> {
+                                networkService?.let {
+                                    ConnectedUsersDialog(it.getConnectedUsers()) {
+                                        vm.showConnectedDevs(false)
+                                    }
+                                }
+                            }
+                            false -> {
+
+                            }
                         }
 
                         BotaAppBar(selectedDestination, vm.getProgressState(), vm.getProgressDialogState(),

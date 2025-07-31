@@ -214,7 +214,13 @@ class NetworkService : Service(), NetworkService.NetworkCallback {
 
     override fun onDestroy() {
         super.onDestroy()
-        botaServer.stopServer()
+        try {
+            botaServer.stopServer()
+        }
+        catch (e : Exception){
+
+        }
+
         Log.d("BTU_S", "Destroyed")
     }
 

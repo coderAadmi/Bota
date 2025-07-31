@@ -105,4 +105,11 @@ class QrViewModel @Inject constructor(private val repository: BotaRepository) : 
     fun removeUpdatesFor(ip: String) {
         repository.removeUpdatesFor(ip)
     }
+
+    fun showConnectedDevs(show : Boolean) {
+        repository.showConnectedDevs(show)
+    }
+    fun getConnectedDevShownState(): StateFlow<Boolean> {
+        return repository.connectedDevShownState
+    }
 }

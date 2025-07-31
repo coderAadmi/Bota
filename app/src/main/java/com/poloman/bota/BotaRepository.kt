@@ -184,4 +184,10 @@ class BotaRepository @Inject constructor(private val appContext : Context,
         _networkRequestsState.value = list
     }
 
+    private val _connectedDevShown = MutableStateFlow<Boolean>(false)
+    val connectedDevShownState = _connectedDevShown.asStateFlow()
+    fun showConnectedDevs(show : Boolean) {
+        _connectedDevShown.value = show
+    }
+
 }
