@@ -77,8 +77,15 @@ fun HomePage(communicator: Communicator) {
         val ( strategy, genQR, scanQR, qrImg, ipRef) = createRefs()
         val context = LocalContext.current
 
-        var serverBtnText by rememberSaveable { mutableStateOf("Start Server") }
-        var serverBtnColor by remember { mutableStateOf(Color(0xFF0A80ED)) }
+        val qrCodeState by qrVm.getQrCodeState().collectAsState()
+
+        val (serverBtnText, serverBtnColor) = if (qrCodeState != null) {
+            "Stop Server" to Color.Black
+        } else {
+            "Start Server" to Color(0xFF0A80ED)
+        }
+//        var serverBtnText by rememberSaveable { mutableStateOf("Start Server") }
+//        var serverBtnColor by remember { mutableStateOf(Color(0xFF0A80ED)) }
 
         Text(
             "Choose how you want to connect to other devices on your local network",
@@ -136,8 +143,8 @@ fun HomePage(communicator: Communicator) {
 
 
         qrVm.getQrCodeState().collectAsState().value?.let {
-            serverBtnText = "Stop Server"
-            serverBtnColor = Color.Black
+//            serverBtnText = "Stop Server"
+//            serverBtnColor = Color.Black
             Image(
                 painter = rememberImagePainter(it),
                 contentDescription = "",
@@ -157,9 +164,6 @@ fun HomePage(communicator: Communicator) {
                 top.linkTo(qrImg.bottom, margin = 16.dp)
                 centerHorizontallyTo(parent)
             }, color = Color.Black, fontWeight = FontWeight.Bold)
-        }?:run {
-            serverBtnText = "Start Server"
-            serverBtnColor = Color(0xFF0A80ED)
         }
 
     }

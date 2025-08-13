@@ -33,8 +33,12 @@ fun SettingsPage(communicator: Communicator) {
             communicator.showConnectedDevices()
         }
         Spacer(Modifier.height(12.dp))
+        OptionCard("Make sure all the devices you want to connect, are on same WiFi network.",painterResource(R.drawable.file)) { }
+        Spacer(Modifier.height(8.dp))
         OptionCard("Files are stored in internal files > BotaStorage folder",painterResource(R.drawable.file)) { }
-        OptionCard("Clicking Select Files to Transfer on Transfer page willclear previous selected files", painterResource(R.drawable.file)) { }
+        Spacer(Modifier.height(8.dp))
+        OptionCard("Clicking Select Files to Transfer on Transfer page will clear previous selected files", painterResource(R.drawable.file)) { }
+        Spacer(Modifier.height(12.dp))
         OptionCard("Developed by Pradyumn Upadhyay", painterResource(R.drawable.file)) { }
     }
 }
